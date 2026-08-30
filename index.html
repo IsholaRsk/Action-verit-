@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LUNACORE — Techwear & Streetwear</title>
+<meta name="description" content="SS23 Sale — Style and comfort in one piece.">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="site">
+  <div class="header-inner">
+    <a href="#/" class="logo">LUNA<span class="accent">CORE</span></a>
+    <nav class="main-nav">
+      <a href="#/category/new">NEW</a>
+      <a href="#/category/men">MEN</a>
+      <a href="#/category/women">WOMEN</a>
+      <a href="#/category/accessories">ACCESSORIES</a>
+    </nav>
+    <div class="header-right">
+      <a href="#/" class="login-link">LOG IN</a>
+      <button id="cart-toggle-btn">CART<span id="cart-count"></span></button>
+    </div>
+  </div>
+</header>
+
+<main id="app"></main>
+
+<footer class="site">
+  <div class="footer-inner">
+    <div class="col"><span>SHIPPING</span><span>ABOUT US</span><span>HELP</span></div>
+    <div class="col"><span>CONTACT US</span><span>PAYMENT</span><span>BLOG</span></div>
+    <div class="col"><span>INSTAGRAM</span><span>YOUTUBE</span><span>TIKTOK</span><span>TELEGRAM</span></div>
+  </div>
+  <div class="footer-bottom" id="footer-year">© 2026 LUNACORE — Made in Bénin, since 2026.</div>
+</footer>
+
+<div id="cart-overlay"></div>
+<aside id="cart-drawer">
+  <div class="cart-header">
+    <h2>VOTRE PANIER</h2>
+    <button id="cart-close-btn">✕</button>
+  </div>
+  <div class="cart-items" id="cart-items"></div>
+  <div class="cart-footer">
+    <div class="subtotal-row">
+      <span class="muted">Sous-total</span>
+      <span class="amount" id="cart-subtotal">$0.00</span>
+    </div>
+    <a href="#/checkout" id="checkout-link">PASSER LA COMMANDE</a>
+  </div>
+</aside>
+
+<script>
+/* ---------------- Data ---------------- */
+const PRODUCTS = [
+  {
+    id: "p1", slug: "kimono-liu-kang", name: "Kimono Liu Kang", price: 180, compareAtPrice: 260,
+    category: "men",
+    image: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800",
+    description: "Kimono technique en coton lourd, coupe oversize, imprimé calligraphié dans le dos. Pièce signature de la collection SS23.",
+    sizes: ["S","M","L","XL"], stock: 24, tags: ["new","sale"]
+  },
+  {
+    id: "p2", slug: "asobai-stalker", name: "Asobai Stalker", price: 165, compareAtPrice: 220,
+    category: "men",
+    image: "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=800",
+    description: "Veste utilitaire multi-poches, tissu déperlant, capuche ajustable.",
+    sizes: ["S","M","L","XL"], stock: 15, tags: ["new","sale"]
+  },
+  {
+    id: "p3", slug: "shadow-hoodie", name: "Shadow Tech Hoodie", price: 140,
+    category: "men",
+    image: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800",
+    description: "Hoodie technique gris anthracite, doublure polaire, capuche renforcée.",
+    sizes: ["S","M","L","XL","XXL"], stock: 32, tags: ["new"]
+  },
+  {
+    id: "p4", slug: "raven-longsleeve", name: "Raven Longsleeve", price: 95,
+    category: "men",
+    image: "https://images.unsplash.com/photo-1503341504253-dff4815485f1?w=800",
+    description: "T-shirt manches longues en jersey lourd, print graphique minimal.",
+    sizes: ["S","M","L","XL"], stock: 40, tags: ["new"]
+  },
+  {
+    id: "p5", slug: "duo-print-crewneck", name: "Duo Print Crewneck", price: 110,
+    category: "men",
+    image: "https://images.unsplash.com/photo-1517438476312-10d79c077509?w=800",
+    description: "Sweat col rond épais, print duo à l'avant, finitions côtelées.",
+    sizes: ["S","M","L","XL"], stock: 18, tags: []
+  },
+  {
+    id: "p6", slug: "tactical-sling-bag", name: "Tactical Sling Bag", price: 85,
+    category: "accessories",
+    image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800",
+    description: "Sac banane tactique multi-compartiments, sangle réglable, résistant à l'eau.",
+    sizes: ["Unique"], stock: 50, tags: []
+  },
+  {
+    id: "p7", slug: "horn-headpiece", name: "Horn Headpiece", price: 60,
+    category: "women",
+    image: "https://images.unsplash.com/photo-1445205170230-053b83016050?w=800",
+    description: "Accessoire de tête sculptural, pièce éditoriale de la collection PF23.",
+    sizes: ["Unique"], stock: 10, tags: ["new"]
+  },
+  {
+    id: "p8", slug: "cropped-tech-set", name: "Cropped Tech Set", price: 130,
+    category: "women",
+    image: "https://images.unsplash.com/photo-1548624313-0396c75f1b6a?w=800",
+    description: "Ensemble crop top et pantalon technique, taille haute, coupe ajustée.",
+    sizes: ["XS","S","M","L"], stock: 22, tags: ["new"]
+  }
+];
+
+function getAllProducts(){ return PRODUCTS; }
+function getProductBySlug(slug){ return PRODUCTS.find(p => p.slug === slug) || null; }
+function getProductsByCategory(cat){
+  if (cat === "all") return PRODUCTS;
+  return PRODUCTS.filter(p => p.category === cat);
+}
+
+/* ---------------- Cart store (localStorage) ---------------- */
+const CART_KEY = "lunacore-cart";
+function loadCart(){
+  try{
+    const raw = localStorage.getItem(CART_KEY);
+    return raw ? JSON.parse(raw) : [];
+  }catch(e){ return []; }
+}
+function saveCart(items){
+  localStorage.setItem(CART_KEY, JSON.stringify(items));
+}
+let cartItems = loadCart();
+let cartOpen = false;
+
+function cartTotalItems(){ return cartItems.reduce((s,i)=>s+i.qty,0); }
+function cartTotalPrice(){ return cartItems.reduce((s,i)=>s+i.qty*i.price,0); }
+
+function addToCart(item, qty=1){
+  const existing = cartItems.find(i => i.id===item.id && i.size===item.size);
+  if (existing){
+    existing.qty += qty;
+  } else {
+    cartItems.push({...item, qty});
+  }
+  saveCart(cartItems);
+  toggleCart(true);
+  renderCart();
+}
+function removeFromCart(id, size){
+  cartItems = cartItems.filter(i => !(i.id===id && i.size===size));
+  saveCart(cartItems);
+  renderCart();
+}
+function updateQty(id, size, qty){
+  cartItems = cartItems.map(i => (i.id===id && i.size===size) ? {...i, qty} : i).filter(i => i.qty > 0);
+  saveCart(cartItems);
+  renderCart();
+}
+function clearCart(){
+  cartItems = [];
+  saveCart(cartItems);
+  renderCart();
+}
+
+function toggleCart(open){
+  cartOpen = (open === undefined) ? !cartOpen : open;
+  const overlay = document.getElementById('cart-overlay');
+  const drawer = document.getElementById('cart-drawer');
+  overlay.classList.toggle('open', cartOpen);
+  drawer.classList.toggle('open', cartOpen);
+}
+
+function renderCart(){
+  const countEl = document.getElementById('cart-count');
+  const total = cartTotalItems();
+  countEl.textContent = total > 0 ? ` (${total})` : '';
+
+  const itemsEl = document.getElementById('cart-items');
+  if (cartItems.length === 0){
+    itemsEl.innerHTML = '<p class="muted" style="font-size:14px;">Votre panier est vide.</p>';
+  } else {
+    itemsEl.innerHTML = cartItems.map(item => `
+      <div class="cart-item">
+        <div class="thumb"><img src="${item.image}" alt="${escapeHtml(item.name)}"></div>
+        <div class="details">
+          <p class="name">${escapeHtml(item.name)}</p>
+          <p class="size">Taille : ${escapeHtml(item.size)}</p>
+          <div class="qty-controls">
+            <button class="qty-btn" onclick="updateQty('${item.id}','${item.size}',${item.qty - 1})">-</button>
+            <span style="font-size:14px;">${item.qty}</span>
+            <button class="qty-btn" onclick="updateQty('${item.id}','${item.size}',${item.qty + 1})">+</button>
+          </div>
+        </div>
+        <div class="right-col">
+          <p>$${item.price * item.qty}</p>
+          <button class="remove-btn" onclick="removeFromCart('${item.id}','${item.size}')">Retirer</button>
+        </div>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('cart-subtotal').textContent = '$' + cartTotalPrice().toFixed(2);
+  const checkoutLink = document.getElementById('checkout-link');
+  if (cartItems.length === 0){
+    checkoutLink.classList.add('disabled');
+  } else {
+    checkoutLink.classList.remove('disabled');
+  }
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+/* ---------------- Templates ---------------- */
+function productCardHtml(p){
+  return `
+    <a href="#/product/${p.slug}" class="product-card">
+      <div class="thumb">
+        <img src="${p.image}" alt="${escapeHtml(p.name)}">
+        ${p.tags.includes('sale') ? '<span class="badge-sale">SALE</span>' : ''}
+      </div>
+      <div class="info">
+        <p class="name">${escapeHtml(p.name)}</p>
+        <div class="prices">
+          <span>$${p.price}</span>
+          ${p.compareAtPrice ? `<span class="line-through-price">$${p.compareAtPrice}</span>` : ''}
+        </div>
+      </div>
+    </a>
+  `;
+}
+
+function renderHome(){
+  const products = getAllProducts();
+  const newArrivals = products.filter(p => p.tags.includes('new')).slice(0,4);
+  return `
+    <section class="hero" style="padding:0;">
+      <img src="https://images.unsplash.com/photo-1520975954732-35dd22299614?w=1600" alt="SS23 Sale">
+      <div class="overlay"></div>
+      <div class="hero-content">
+        <h1>SS23 <span class="accent" style="color:var(--accent);">SALE</span></h1>
+        <p>Style and comfort in one piece — Feel the difference with our comfortable and stylish collections.</p>
+        <a href="#/category/all" class="btn-accent">SHOP NOW</a>
+      </div>
+    </section>
+
+    <section>
+      <div class="section-inner">
+        <div class="section-head">
+          <h2>NEW ARRIVALS</h2>
+          <a href="#/category/all">SHOP ALL</a>
+        </div>
+        <div class="grid-products">
+          ${newArrivals.map(productCardHtml).join('')}
+        </div>
+      </div>
+    </section>
+
+    <section style="padding-top:0;">
+      <div class="section-inner">
+        <div class="cat-tiles">
+          <a href="#/category/men" class="cat-tile">
+            <img src="https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=800" alt="MEN'S CLOTHING">
+            <div class="overlay"></div>
+            <span>MEN'S CLOTHING</span>
+          </a>
+          <a href="#/category/accessories" class="cat-tile">
+            <img src="https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800" alt="ACCESSORIES">
+            <div class="overlay"></div>
+            <span>ACCESSORIES</span>
+          </a>
+          <a href="#/category/women" class="cat-tile">
+            <img src="https://images.unsplash.com/photo-1548624313-0396c75f1b6a?w=800" alt="WOMEN'S CLOTHING">
+            <div class="overlay"></div>
+            <span>WOMEN'S CLOTHING</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section style="padding-top:0;">
+      <div class="section-inner">
+        <div class="banner">
+          <img src="https://images.unsplash.com/photo-1490114538077-0a7f8cb49891?w=1600" alt="Lunacore PF23 Collection">
+          <div class="overlay"></div>
+          <div class="content">
+            <h3>LUNACORE PF23 COLLECTION</h3>
+            <p>Explore the boundaries of style with our Pre-Fall 2023 collection.</p>
+            <a href="#/category/all" class="btn-outline">VIEW COLLECTION</a>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderCategory(category){
+  const products = category === 'new'
+    ? getAllProducts().filter(p => p.tags.includes('new'))
+    : getProductsByCategory(category);
+  const title = category === 'all' ? 'Tous les produits' : category;
+  return `
+    <div class="max-w" style="padding-top:48px;padding-bottom:48px;">
+      <h1 class="page-title">${escapeHtml(title)}</h1>
+      ${products.length === 0
+        ? '<p class="muted">Aucun produit dans cette catégorie.</p>'
+        : `<div class="grid-products">${products.map(productCardHtml).join('')}</div>`
+      }
+    </div>
+  `;
+}
+
+let selectedSize = {};
+
+function renderProduct(slug){
+  const product = getProductBySlug(slug);
+  if (!product) return renderNotFound();
+  if (!(slug in selectedSize)) selectedSize[slug] = product.sizes[0];
+  const currentSize = selectedSize[slug];
+
+  return `
+    <div class="product-page">
+      <div class="main-img"><img src="${product.image}" alt="${escapeHtml(product.name)}"></div>
+      <div>
+        <h1>${escapeHtml(product.name)}</h1>
+        <div class="prices">
+          <span>$${product.price}</span>
+          ${product.compareAtPrice ? `<span class="line-through-price">$${product.compareAtPrice}</span>` : ''}
+        </div>
+        <p class="desc">${escapeHtml(product.description)}</p>
+        <div style="margin-top:24px;">
+          <p class="sizes-label">Taille</p>
+          <div class="sizes" id="sizes-container">
+            ${product.sizes.map(s => `
+              <button class="size-btn ${s===currentSize ? 'selected' : ''}" onclick="selectSize('${slug}','${s}')">${s}</button>
+            `).join('')}
+          </div>
+          <button class="add-cart-btn" ${product.stock===0?'disabled':''} onclick="handleAddToCart('${slug}')">
+            ${product.stock === 0 ? 'RUPTURE DE STOCK' : 'AJOUTER AU PANIER'}
+          </button>
+        </div>
+        <p class="stock-note">${product.stock > 0 ? product.stock + ' en stock' : 'Rupture de stock'}</p>
+      </div>
+    </div>
+  `;
+}
+function selectSize(slug, size){
+  selectedSize[slug] = size;
+  render();
+}
+function handleAddToCart(slug){
+  const product = getProductBySlug(slug);
+  if (!product) return;
+  addToCart({
+    id: product.id,
+    slug: product.slug,
+    name: product.name,
+    price: product.price,
+    image: product.image,
+    size: selectedSize[slug]
+  });
+}
+
+let checkoutForm = { email:'', fullName:'', address:'', city:'', country:'Bénin' };
+let checkoutError = '';
+let checkoutLoading = false;
+
+function renderCheckout(){
+  if (cartItems.length === 0){
+    return `<div class="center-page"><p class="muted">Votre panier est vide.</p></div>`;
+  }
+  return `
+    <div class="checkout-page">
+      <form id="checkout-form">
+        <h1>Informations de livraison</h1>
+        <input required type="email" placeholder="Email" value="${escapeHtml(checkoutForm.email)}" oninput="checkoutForm.email=this.value">
+        <input required placeholder="Nom complet" value="${escapeHtml(checkoutForm.fullName)}" oninput="checkoutForm.fullName=this.value">
+        <input required placeholder="Adresse" value="${escapeHtml(checkoutForm.address)}" oninput="checkoutForm.address=this.value">
+        <input required placeholder="Ville" value="${escapeHtml(checkoutForm.city)}" oninput="checkoutForm.city=this.value">
+        <input required placeholder="Pays" value="${escapeHtml(checkoutForm.country)}" oninput="checkoutForm.country=this.value">
+        ${checkoutError ? `<p class="error">${escapeHtml(checkoutError)}</p>` : ''}
+        <button type="submit" class="submit-btn" ${checkoutLoading ? 'disabled' : ''}>
+          ${checkoutLoading ? 'TRAITEMENT...' : 'CONFIRMER LA COMMANDE'}
+        </button>
+        <p class="hint">Paiement de démonstration — commande enregistrée localement dans votre navigateur.</p>
+      </form>
+
+      <div>
+        <h2>Récapitulatif</h2>
+        <div>
+          ${cartItems.map(item => `
+            <div class="summary-row">
+              <span>${escapeHtml(item.name)} (${escapeHtml(item.size)}) × ${item.qty}</span>
+              <span>$${item.price * item.qty}</span>
+            </div>
+          `).join('')}
+        </div>
+        <div class="summary-total">
+          <span>Total</span>
+          <span>$${cartTotalPrice().toFixed(2)}</span>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function handleCheckoutSubmit(e){
+  e.preventDefault();
+  checkoutLoading = true;
+  checkoutError = '';
+  render();
+  setTimeout(() => {
+    try{
+      if (!checkoutForm.email || !checkoutForm.fullName || !checkoutForm.address || !checkoutForm.city){
+        throw new Error("Veuillez remplir tous les champs.");
+      }
+      const orderId = 'LC-' + Date.now().toString(36).toUpperCase();
+      clearCart();
+      checkoutForm = { email:'', fullName:'', address:'', city:'', country:'Bénin' };
+      checkoutLoading = false;
+      window.location.hash = `#/checkout/success?order=${orderId}`;
+    }catch(err){
+      checkoutError = err.message;
+      checkoutLoading = false;
+      render();
+    }
+  }, 500);
+}
+
+function renderSuccess(orderId){
+  return `
+    <div class="center-page">
+      <h1>Merci pour votre commande 🎉</h1>
+      <p class="muted" style="margin-bottom:8px;">Numéro de commande :</p>
+      <p style="font-family:monospace;color:var(--accent);margin-bottom:32px;">${escapeHtml(orderId || '')}</p>
+      <a href="#/" class="btn-accent">RETOUR À LA BOUTIQUE</a>
+    </div>
+  `;
+}
+
+function renderNotFound(){
+  return `
+    <div class="center-page">
+      <h1 style="font-size:32px;">404</h1>
+      <p class="muted" style="margin-bottom:32px;">Cette page n'existe pas.</p>
+      <a href="#/" style="color:var(--accent);text-decoration:underline;">Retour à l'accueil</a>
+    </div>
+  `;
+}
+
+/* ---------------- Router ---------------- */
+function parseHash(){
+  let hash = window.location.hash || '#/';
+  hash = hash.slice(1); // remove #
+  const [path, query] = hash.split('?');
+  const params = new URLSearchParams(query || '');
+  const segments = path.split('/').filter(Boolean);
+  return { segments, params };
+}
+
+function render(){
+  const { segments, params } = parseHash();
+  const app = document.getElementById('app');
+  window.scrollTo(0,0);
+
+  if (segments.length === 0){
+    app.innerHTML = renderHome();
+  } else if (segments[0] === 'category' && segments[1]){
+    app.innerHTML = renderCategory(segments[1]);
+  } else if (segments[0] === 'product' && segments[1]){
+    app.innerHTML = renderProduct(segments[1]);
+  } else if (segments[0] === 'checkout' && segments[1] === 'success'){
+    app.innerHTML = renderSuccess(params.get('order'));
+  } else if (segments[0] === 'checkout'){
+    app.innerHTML = renderCheckout();
+    const form = document.getElementById('checkout-form');
+    if (form) form.addEventListener('submit', handleCheckoutSubmit);
+  } else {
+    app.innerHTML = renderNotFound();
+  }
+
+  renderCart();
+}
+
+/* ---------------- Init ---------------- */
+document.getElementById('cart-toggle-btn').addEventListener('click', () => toggleCart());
+document.getElementById('cart-close-btn').addEventListener('click', () => toggleCart(false));
+document.getElementById('cart-overlay').addEventListener('click', () => toggleCart(false));
+document.getElementById('checkout-link').addEventListener('click', () => toggleCart(false));
+document.getElementById('footer-year').textContent = `© ${new Date().getFullYear()} LUNACORE — Made in Bénin, since 2026.`;
+
+window.addEventListener('hashchange', render);
+window.addEventListener('load', render);
+render();
+</script>
+</body>
+</html>
