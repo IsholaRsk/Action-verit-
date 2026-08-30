@@ -1,502 +1,1252 @@
 <!DOCTYPE html>
 <html lang="fr">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LUNACORE — Techwear & Streetwear</title>
-<meta name="description" content="SS23 Sale — Style and comfort in one piece.">
-<link rel="stylesheet" href="style.css">
-</head>
-<body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EscortHub</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="header-inner">
+        <a href="#/" class="brand">Escort<span>Hub</span></a>
+        <nav class="main-nav">
+          <a href="#/">Accueil</a>
+          <a href="#/products">Produits</a>
+        </nav>
+        <div class="header-actions">
+          <button id="post-ad-btn" class="post-btn">Poster une annonce</button>
+          <a href="#/login" id="login-link" class="nav-link">Connexion</a>
+          <a href="#/signup" id="signup-link" class="nav-link">Inscription</a>
+          <button id="logout-btn" class="logout-btn hidden">Déconnexion</button>
+        </div>
+      </div>
+    </header>
 
-<header class="site">
-  <div class="header-inner">
-    <a href="#/" class="logo">LUNA<span class="accent">CORE</span></a>
-    <nav class="main-nav">
-      <a href="#/category/new">NEW</a>
-      <a href="#/category/men">MEN</a>
-      <a href="#/category/women">WOMEN</a>
-      <a href="#/category/accessories">ACCESSORIES</a>
-    </nav>
-    <div class="header-right">
-      <a href="#/" class="login-link">LOG IN</a>
-      <button id="cart-toggle-btn">CART<span id="cart-count"></span></button>
+    <div id="site-banner" class="site-banner"></div>
+    <div id="site-notice" class="site-notice hidden"></div>
+
+    <main id="app"></main>
+
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <span>EscortHub</span>
+        <span>© <span id="footer-year"></span> Tous droits réservés</span>
+      </div>
+    </footer>
+
+    <div id="ad-modal" class="modal hidden">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h3>Poster une annonce</h3>
+          <button id="close-ad-modal" class="close-btn" type="button">×</button>
+        </div>
+        <form id="ad-form">
+          <label>
+            <span>Titre de l’annonce</span>
+            <input type="text" name="adTitle" placeholder="Ex: Vente flash" required />
+          </label>
+          <label>
+            <span>Texte</span>
+            <textarea name="adText" rows="3" placeholder="Votre message publicitaire"></textarea>
+          </label>
+          <label>
+            <span>Type de média</span>
+            <select name="mediaType">
+              <option value="text">Texte</option>
+              <option value="image">Image</option>
+              <option value="video">Vidéo</option>
+            </select>
+          </label>
+          <label>
+            <span>Téléverser une image ou vidéo</span>
+            <input type="file" name="mediaUpload" accept="image/*,video/*" />
+          </label>
+          <label>
+            <span>Ou coller une URL du média</span>
+            <input type="url" name="mediaUrl" placeholder="https://..." />
+          </label>
+          <button type="submit" class="btn-primary full">Payer 14,99$ et publier</button>
+        </form>
+      </div>
     </div>
-  </div>
-</header>
 
-<main id="app"></main>
+    <div id="payment-modal" class="modal hidden">
+      <div class="modal-card">
+        <div class="modal-head">
+          <h3 id="payment-title">Paiement</h3>
+          <button id="close-payment-modal" class="close-btn" type="button">×</button>
+        </div>
 
-<footer class="site">
-  <div class="footer-inner">
-    <div class="col"><span>SHIPPING</span><span>ABOUT US</span><span>HELP</span></div>
-    <div class="col"><span>CONTACT US</span><span>PAYMENT</span><span>BLOG</span></div>
-    <div class="col"><span>INSTAGRAM</span><span>YOUTUBE</span><span>TIKTOK</span><span>TELEGRAM</span></div>
-  </div>
-  <div class="footer-bottom" id="footer-year">© 2026 LUNACORE — Made in Bénin, since 2026.</div>
-</footer>
+        <form id="payment-form">
+          <input type="hidden" id="payment-target" name="target" />
+          <input type="hidden" id="payment-product-id" name="productId" />
+          <input type="hidden" id="payment-ad-id" name="adId" />
+          <input type="hidden" id="payment-amount" name="amount" />
 
-<div id="cart-overlay"></div>
-<aside id="cart-drawer">
-  <div class="cart-header">
-    <h2>VOTRE PANIER</h2>
-    <button id="cart-close-btn">✕</button>
-  </div>
-  <div class="cart-items" id="cart-items"></div>
-  <div class="cart-footer">
-    <div class="subtotal-row">
-      <span class="muted">Sous-total</span>
-      <span class="amount" id="cart-subtotal">$0.00</span>
-    </div>
-    <a href="#/checkout" id="checkout-link">PASSER LA COMMANDE</a>
-  </div>
-</aside>
-
-<script>
-/* ---------------- Data ---------------- */
-const PRODUCTS = [
-  {
-    id: "p1", slug: "kimono-liu-kang", name: "Kimono Liu Kang", price: 180, compareAtPrice: 260,
-    category: "men",
-    image: "https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800",
-    description: "Kimono technique en coton lourd, coupe oversize, imprimé calligraphié dans le dos. Pièce signature de la collection SS23.",
-    sizes: ["S","M","L","XL"], stock: 24, tags: ["new","sale"]
-  },
-  {
-    id: "p2", slug: "asobai-stalker", name: "Asobai Stalker", price: 165, compareAtPrice: 220,
-    category: "men",
-    image: "https://images.unsplash.com/photo-1551028719-00167b16eac5?w=800",
-    description: "Veste utilitaire multi-poches, tissu déperlant, capuche ajustable.",
-    sizes: ["S","M","L","XL"], stock: 15, tags: ["new","sale"]
-  },
-  {
-    id: "p3", slug: "shadow-hoodie", name: "Shadow Tech Hoodie", price: 140,
-    category: "men",
-    image: "https://images.unsplash.com/photo-1556905055-8f358a7a47b2?w=800",
-    description: "Hoodie technique gris anthracite, doublure polaire, capuche renforcée.",
-    sizes: ["S","M","L","XL","XXL"], stock: 32, tags: ["new"]
-  },
-  {
-    id: "p4", slug: "raven-longsleeve", name: "Raven Longsleeve", price: 95,
-    category: "men",
-    image: "https://images.unsplash.com/photo-1503341504253-dff4815485f1?w=800",
-    description: "T-shirt manches longues en jersey lourd, print graphique minimal.",
-    sizes: ["S","M","L","XL"], stock: 40, tags: ["new"]
-  },
-  {
-    id: "p5", slug: "duo-print-crewneck", name: "Duo Print Crewneck", price: 110,
-    category: "men",
-    image: "https://images.unsplash.com/photo-1517438476312-10d79c077509?w=800",
-    description: "Sweat col rond épais, print duo à l'avant, finitions côtelées.",
-    sizes: ["S","M","L","XL"], stock: 18, tags: []
-  },
-  {
-    id: "p6", slug: "tactical-sling-bag", name: "Tactical Sling Bag", price: 85,
-    category: "accessories",
-    image: "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800",
-    description: "Sac banane tactique multi-compartiments, sangle réglable, résistant à l'eau.",
-    sizes: ["Unique"], stock: 50, tags: []
-  },
-  {
-    id: "p7", slug: "horn-headpiece", name: "Horn Headpiece", price: 60,
-    category: "women",
-    image: "https://images.unsplash.com/photo-1445205170230-053b83016050?w=800",
-    description: "Accessoire de tête sculptural, pièce éditoriale de la collection PF23.",
-    sizes: ["Unique"], stock: 10, tags: ["new"]
-  },
-  {
-    id: "p8", slug: "cropped-tech-set", name: "Cropped Tech Set", price: 130,
-    category: "women",
-    image: "https://images.unsplash.com/photo-1548624313-0396c75f1b6a?w=800",
-    description: "Ensemble crop top et pantalon technique, taille haute, coupe ajustée.",
-    sizes: ["XS","S","M","L"], stock: 22, tags: ["new"]
-  }
-];
-
-function getAllProducts(){ return PRODUCTS; }
-function getProductBySlug(slug){ return PRODUCTS.find(p => p.slug === slug) || null; }
-function getProductsByCategory(cat){
-  if (cat === "all") return PRODUCTS;
-  return PRODUCTS.filter(p => p.category === cat);
-}
-
-/* ---------------- Cart store (localStorage) ---------------- */
-const CART_KEY = "lunacore-cart";
-function loadCart(){
-  try{
-    const raw = localStorage.getItem(CART_KEY);
-    return raw ? JSON.parse(raw) : [];
-  }catch(e){ return []; }
-}
-function saveCart(items){
-  localStorage.setItem(CART_KEY, JSON.stringify(items));
-}
-let cartItems = loadCart();
-let cartOpen = false;
-
-function cartTotalItems(){ return cartItems.reduce((s,i)=>s+i.qty,0); }
-function cartTotalPrice(){ return cartItems.reduce((s,i)=>s+i.qty*i.price,0); }
-
-function addToCart(item, qty=1){
-  const existing = cartItems.find(i => i.id===item.id && i.size===item.size);
-  if (existing){
-    existing.qty += qty;
-  } else {
-    cartItems.push({...item, qty});
-  }
-  saveCart(cartItems);
-  toggleCart(true);
-  renderCart();
-}
-function removeFromCart(id, size){
-  cartItems = cartItems.filter(i => !(i.id===id && i.size===size));
-  saveCart(cartItems);
-  renderCart();
-}
-function updateQty(id, size, qty){
-  cartItems = cartItems.map(i => (i.id===id && i.size===size) ? {...i, qty} : i).filter(i => i.qty > 0);
-  saveCart(cartItems);
-  renderCart();
-}
-function clearCart(){
-  cartItems = [];
-  saveCart(cartItems);
-  renderCart();
-}
-
-function toggleCart(open){
-  cartOpen = (open === undefined) ? !cartOpen : open;
-  const overlay = document.getElementById('cart-overlay');
-  const drawer = document.getElementById('cart-drawer');
-  overlay.classList.toggle('open', cartOpen);
-  drawer.classList.toggle('open', cartOpen);
-}
-
-function renderCart(){
-  const countEl = document.getElementById('cart-count');
-  const total = cartTotalItems();
-  countEl.textContent = total > 0 ? ` (${total})` : '';
-
-  const itemsEl = document.getElementById('cart-items');
-  if (cartItems.length === 0){
-    itemsEl.innerHTML = '<p class="muted" style="font-size:14px;">Votre panier est vide.</p>';
-  } else {
-    itemsEl.innerHTML = cartItems.map(item => `
-      <div class="cart-item">
-        <div class="thumb"><img src="${item.image}" alt="${escapeHtml(item.name)}"></div>
-        <div class="details">
-          <p class="name">${escapeHtml(item.name)}</p>
-          <p class="size">Taille : ${escapeHtml(item.size)}</p>
-          <div class="qty-controls">
-            <button class="qty-btn" onclick="updateQty('${item.id}','${item.size}',${item.qty - 1})">-</button>
-            <span style="font-size:14px;">${item.qty}</span>
-            <button class="qty-btn" onclick="updateQty('${item.id}','${item.size}',${item.qty + 1})">+</button>
+          <div class="payment-methods">
+            <label class="method-option">
+              <input type="radio" name="method" value="transcash" checked />
+              <span>Recharge TransCash</span>
+            </label>
+            <label class="method-option">
+              <input type="radio" name="method" value="card" />
+              <span>Paiement par carte</span>
+            </label>
           </div>
-        </div>
-        <div class="right-col">
-          <p>$${item.price * item.qty}</p>
-          <button class="remove-btn" onclick="removeFromCart('${item.id}','${item.size}')">Retirer</button>
-        </div>
-      </div>
-    `).join('');
-  }
 
-  document.getElementById('cart-subtotal').textContent = '$' + cartTotalPrice().toFixed(2);
-  const checkoutLink = document.getElementById('checkout-link');
-  if (cartItems.length === 0){
-    checkoutLink.classList.add('disabled');
-  } else {
-    checkoutLink.classList.remove('disabled');
-  }
-}
+          <p class="payment-tip">Astuce : tout paiement d'un montant différent de celui attendu ne sera pas validé.</p>
 
-function escapeHtml(str){
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-/* ---------------- Templates ---------------- */
-function productCardHtml(p){
-  return `
-    <a href="#/product/${p.slug}" class="product-card">
-      <div class="thumb">
-        <img src="${p.image}" alt="${escapeHtml(p.name)}">
-        ${p.tags.includes('sale') ? '<span class="badge-sale">SALE</span>' : ''}
-      </div>
-      <div class="info">
-        <p class="name">${escapeHtml(p.name)}</p>
-        <div class="prices">
-          <span>$${p.price}</span>
-          ${p.compareAtPrice ? `<span class="line-through-price">$${p.compareAtPrice}</span>` : ''}
-        </div>
-      </div>
-    </a>
-  `;
-}
-
-function renderHome(){
-  const products = getAllProducts();
-  const newArrivals = products.filter(p => p.tags.includes('new')).slice(0,4);
-  return `
-    <section class="hero" style="padding:0;">
-      <img src="https://images.unsplash.com/photo-1520975954732-35dd22299614?w=1600" alt="SS23 Sale">
-      <div class="overlay"></div>
-      <div class="hero-content">
-        <h1>SS23 <span class="accent" style="color:var(--accent);">SALE</span></h1>
-        <p>Style and comfort in one piece — Feel the difference with our comfortable and stylish collections.</p>
-        <a href="#/category/all" class="btn-accent">SHOP NOW</a>
-      </div>
-    </section>
-
-    <section>
-      <div class="section-inner">
-        <div class="section-head">
-          <h2>NEW ARRIVALS</h2>
-          <a href="#/category/all">SHOP ALL</a>
-        </div>
-        <div class="grid-products">
-          ${newArrivals.map(productCardHtml).join('')}
-        </div>
-      </div>
-    </section>
-
-    <section style="padding-top:0;">
-      <div class="section-inner">
-        <div class="cat-tiles">
-          <a href="#/category/men" class="cat-tile">
-            <img src="https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=800" alt="MEN'S CLOTHING">
-            <div class="overlay"></div>
-            <span>MEN'S CLOTHING</span>
-          </a>
-          <a href="#/category/accessories" class="cat-tile">
-            <img src="https://images.unsplash.com/photo-1553062407-98eeb64c6a62?w=800" alt="ACCESSORIES">
-            <div class="overlay"></div>
-            <span>ACCESSORIES</span>
-          </a>
-          <a href="#/category/women" class="cat-tile">
-            <img src="https://images.unsplash.com/photo-1548624313-0396c75f1b6a?w=800" alt="WOMEN'S CLOTHING">
-            <div class="overlay"></div>
-            <span>WOMEN'S CLOTHING</span>
-          </a>
-        </div>
-      </div>
-    </section>
-
-    <section style="padding-top:0;">
-      <div class="section-inner">
-        <div class="banner">
-          <img src="https://images.unsplash.com/photo-1490114538077-0a7f8cb49891?w=1600" alt="Lunacore PF23 Collection">
-          <div class="overlay"></div>
-          <div class="content">
-            <h3>LUNACORE PF23 COLLECTION</h3>
-            <p>Explore the boundaries of style with our Pre-Fall 2023 collection.</p>
-            <a href="#/category/all" class="btn-outline">VIEW COLLECTION</a>
+          <div id="transcash-fields" class="method-fields">
+            <input type="hidden" id="transcash-amount" value="0" />
+            <label>
+              <span>Uploader la preuve de recharge</span>
+              <input type="file" id="transcash-proof" accept="image/*" required />
+            </label>
+            <div id="transcash-preview" class="image-preview hidden"></div>
           </div>
-        </div>
-      </div>
-    </section>
-  `;
-}
 
-function renderCategory(category){
-  const products = category === 'new'
-    ? getAllProducts().filter(p => p.tags.includes('new'))
-    : getProductsByCategory(category);
-  const title = category === 'all' ? 'Tous les produits' : category;
-  return `
-    <div class="max-w" style="padding-top:48px;padding-bottom:48px;">
-      <h1 class="page-title">${escapeHtml(title)}</h1>
-      ${products.length === 0
-        ? '<p class="muted">Aucun produit dans cette catégorie.</p>'
-        : `<div class="grid-products">${products.map(productCardHtml).join('')}</div>`
-      }
-    </div>
-  `;
-}
-
-let selectedSize = {};
-
-function renderProduct(slug){
-  const product = getProductBySlug(slug);
-  if (!product) return renderNotFound();
-  if (!(slug in selectedSize)) selectedSize[slug] = product.sizes[0];
-  const currentSize = selectedSize[slug];
-
-  return `
-    <div class="product-page">
-      <div class="main-img"><img src="${product.image}" alt="${escapeHtml(product.name)}"></div>
-      <div>
-        <h1>${escapeHtml(product.name)}</h1>
-        <div class="prices">
-          <span>$${product.price}</span>
-          ${product.compareAtPrice ? `<span class="line-through-price">$${product.compareAtPrice}</span>` : ''}
-        </div>
-        <p class="desc">${escapeHtml(product.description)}</p>
-        <div style="margin-top:24px;">
-          <p class="sizes-label">Taille</p>
-          <div class="sizes" id="sizes-container">
-            ${product.sizes.map(s => `
-              <button class="size-btn ${s===currentSize ? 'selected' : ''}" onclick="selectSize('${slug}','${s}')">${s}</button>
-            `).join('')}
-          </div>
-          <button class="add-cart-btn" ${product.stock===0?'disabled':''} onclick="handleAddToCart('${slug}')">
-            ${product.stock === 0 ? 'RUPTURE DE STOCK' : 'AJOUTER AU PANIER'}
-          </button>
-        </div>
-        <p class="stock-note">${product.stock > 0 ? product.stock + ' en stock' : 'Rupture de stock'}</p>
-      </div>
-    </div>
-  `;
-}
-function selectSize(slug, size){
-  selectedSize[slug] = size;
-  render();
-}
-function handleAddToCart(slug){
-  const product = getProductBySlug(slug);
-  if (!product) return;
-  addToCart({
-    id: product.id,
-    slug: product.slug,
-    name: product.name,
-    price: product.price,
-    image: product.image,
-    size: selectedSize[slug]
-  });
-}
-
-let checkoutForm = { email:'', fullName:'', address:'', city:'', country:'Bénin' };
-let checkoutError = '';
-let checkoutLoading = false;
-
-function renderCheckout(){
-  if (cartItems.length === 0){
-    return `<div class="center-page"><p class="muted">Votre panier est vide.</p></div>`;
-  }
-  return `
-    <div class="checkout-page">
-      <form id="checkout-form">
-        <h1>Informations de livraison</h1>
-        <input required type="email" placeholder="Email" value="${escapeHtml(checkoutForm.email)}" oninput="checkoutForm.email=this.value">
-        <input required placeholder="Nom complet" value="${escapeHtml(checkoutForm.fullName)}" oninput="checkoutForm.fullName=this.value">
-        <input required placeholder="Adresse" value="${escapeHtml(checkoutForm.address)}" oninput="checkoutForm.address=this.value">
-        <input required placeholder="Ville" value="${escapeHtml(checkoutForm.city)}" oninput="checkoutForm.city=this.value">
-        <input required placeholder="Pays" value="${escapeHtml(checkoutForm.country)}" oninput="checkoutForm.country=this.value">
-        ${checkoutError ? `<p class="error">${escapeHtml(checkoutError)}</p>` : ''}
-        <button type="submit" class="submit-btn" ${checkoutLoading ? 'disabled' : ''}>
-          ${checkoutLoading ? 'TRAITEMENT...' : 'CONFIRMER LA COMMANDE'}
-        </button>
-        <p class="hint">Paiement de démonstration — commande enregistrée localement dans votre navigateur.</p>
-      </form>
-
-      <div>
-        <h2>Récapitulatif</h2>
-        <div>
-          ${cartItems.map(item => `
-            <div class="summary-row">
-              <span>${escapeHtml(item.name)} (${escapeHtml(item.size)}) × ${item.qty}</span>
-              <span>$${item.price * item.qty}</span>
+          <div id="card-fields" class="method-fields hidden">
+            <label>
+              <span>Nom du titulaire</span>
+              <input type="text" id="card-name" placeholder="Nom complet" />
+            </label>
+            <label>
+              <span>Numéro de carte</span>
+              <input type="text" id="card-number" maxlength="19" placeholder="1234 5678 9012 3456" />
+            </label>
+            <div class="card-row">
+              <label>
+                <span>Expiration</span>
+                <input type="text" id="card-expiry" maxlength="5" placeholder="MM/AA" />
+              </label>
+              <label>
+                <span>CVV</span>
+                <input type="text" id="card-cvv" maxlength="4" placeholder="123" />
+              </label>
             </div>
-          `).join('')}
-        </div>
-        <div class="summary-total">
-          <span>Total</span>
-          <span>$${cartTotalPrice().toFixed(2)}</span>
-        </div>
+          </div>
+
+          <button type="submit" class="btn-primary full">Valider le paiement</button>
+        </form>
       </div>
     </div>
-  `;
-}
 
-function handleCheckoutSubmit(e){
-  e.preventDefault();
-  checkoutLoading = true;
-  checkoutError = '';
-  render();
-  setTimeout(() => {
-    try{
-      if (!checkoutForm.email || !checkoutForm.fullName || !checkoutForm.address || !checkoutForm.city){
-        throw new Error("Veuillez remplir tous les champs.");
+    <script>
+      const STORAGE_KEYS = {
+        users: "escorhub-users",
+        products: "escorhub-products",
+        currentUser: "escorhub-current-user",
+        payments: "escorhub-payments",
+        ads: "escorhub-ads"
+      };
+
+      const ADMIN_CREDENTIALS = { username: "Ijlal", password: "0000" };
+      const FIXED_AD_PRICE = 5000;
+      const HERO_IMAGES = Array.from({ length: 10 }, (_, index) => `${index + 1}.jpg`);
+      const PAYMENT_REDIRECT_KEY = "escorhub-payment-success-link";
+
+      function getPaymentRedirectUrl() {
+        try {
+          const raw = localStorage.getItem(PAYMENT_REDIRECT_KEY);
+          return raw || "https://t.me/yourusername?text=Bonjour%20je%20viens%20de%20valider%20mon%20paiement";
+        } catch {
+          return "https://t.me/yourusername?text=Bonjour%20je%20viens%20de%20valider%20mon%20paiement";
+        }
       }
-      const orderId = 'LC-' + Date.now().toString(36).toUpperCase();
-      clearCart();
-      checkoutForm = { email:'', fullName:'', address:'', city:'', country:'Bénin' };
-      checkoutLoading = false;
-      window.location.hash = `#/checkout/success?order=${orderId}`;
-    }catch(err){
-      checkoutError = err.message;
-      checkoutLoading = false;
+
+      function setPaymentRedirectUrl(url) {
+        localStorage.setItem(PAYMENT_REDIRECT_KEY, url);
+      }
+
+      function formatPrice(value) {
+        return `$${Number(value || 0).toLocaleString("en-US")}`;
+      }
+
+      function startHeroSlideshow() {
+        const hero = document.querySelector(".hero");
+        if (!hero) return;
+
+        let currentIndex = 0;
+        const applyBackground = () => {
+          const image = HERO_IMAGES[currentIndex];
+          hero.style.backgroundImage = `linear-gradient(rgba(0, 0, 0, 0.42), rgba(0, 0, 0, 0.8)), url("${image}")`;
+          currentIndex = (currentIndex + 1) % HERO_IMAGES.length;
+        };
+
+        applyBackground();
+        setInterval(applyBackground, 50000);
+      }
+
+      const DEFAULT_PRODUCTS = [
+        {
+          id: "p1",
+          nom: "Ariana",
+          age: 24,
+          lieu: "Los Angeles",
+          prix: 5000,
+          image: "https://images.unsplash.com/photo-1556740749-887f6717d7e4?auto=format&fit=crop&w=900&q=80"
+        },
+        {
+          id: "p2",
+          nom: "Lina",
+          age: 28,
+          lieu: "Miami",
+          prix: 10000,
+          image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=80"
+        },
+        {
+          id: "p3",
+          nom: "Mia",
+          age: 22,
+          lieu: "New York",
+          prix: 15000,
+          image: "https://images.unsplash.com/photo-1520607162513-77705c0f0d4a?auto=format&fit=crop&w=900&q=80"
+        },
+        {
+          id: "p4",
+          nom: "Sonia",
+          age: 26,
+          lieu: "Chicago",
+          prix: 25000,
+          image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=900&q=80"
+        }
+      ];
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      function getUsers() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.users);
+          return raw ? JSON.parse(raw) : [];
+        } catch {
+          return [];
+        }
+      }
+
+      function saveUsers(users) {
+        localStorage.setItem(STORAGE_KEYS.users, JSON.stringify(users));
+      }
+
+      function getCurrentUser() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.currentUser);
+          return raw ? JSON.parse(raw) : null;
+        } catch {
+          return null;
+        }
+      }
+
+      function setCurrentUser(user) {
+        localStorage.setItem(STORAGE_KEYS.currentUser, JSON.stringify(user));
+      }
+
+      function getProducts() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.products);
+          if (!raw) {
+            localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(DEFAULT_PRODUCTS));
+            return [...DEFAULT_PRODUCTS];
+          }
+          return JSON.parse(raw);
+        } catch {
+          return [...DEFAULT_PRODUCTS];
+        }
+      }
+
+      function saveProducts(products) {
+        localStorage.setItem(STORAGE_KEYS.products, JSON.stringify(products));
+      }
+
+      function getPayments() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.payments);
+          return raw ? JSON.parse(raw) : [];
+        } catch {
+          return [];
+        }
+      }
+
+      function savePayments(payments) {
+        localStorage.setItem(STORAGE_KEYS.payments, JSON.stringify(payments));
+      }
+
+      function getAds() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEYS.ads);
+          return raw ? JSON.parse(raw) : [];
+        } catch {
+          return [];
+        }
+      }
+
+      function saveAds(ads) {
+        localStorage.setItem(STORAGE_KEYS.ads, JSON.stringify(ads));
+      }
+
+      function setPaymentNotice(message, link = "") {
+        localStorage.setItem("escorhub-payment-notice", JSON.stringify({ message, link }));
+        renderNotice();
+      }
+
+      function clearPaymentNotice() {
+        localStorage.removeItem("escorhub-payment-notice");
+        renderNotice();
+      }
+
+      function renderNotice() {
+        const notice = document.getElementById("site-notice");
+        if (!notice) return;
+
+        try {
+          const raw = localStorage.getItem("escorhub-payment-notice");
+          if (!raw) {
+            notice.classList.add("hidden");
+            notice.innerHTML = "";
+            return;
+          }
+
+          const data = JSON.parse(raw);
+          if (!data || !data.message) {
+            notice.classList.add("hidden");
+            notice.innerHTML = "";
+            return;
+          }
+
+          notice.innerHTML = data.link
+            ? `<p>${escapeHtml(data.message)} <a href="${data.link}">Poursuivre vers la discussion</a></p>`
+            : `<p>${escapeHtml(data.message)}</p>`;
+          notice.classList.remove("hidden");
+        } catch {
+          notice.classList.add("hidden");
+          notice.innerHTML = "";
+        }
+      }
+
+      function logoutUser() {
+        localStorage.removeItem(STORAGE_KEYS.currentUser);
+        window.location.hash = "#/";
+        render();
+      }
+
+      function openPaymentModal({ target, productId = "", amount = 0, title = "Paiement", adId = "" }) {
+        const modal = document.getElementById("payment-modal");
+        document.getElementById("payment-title").textContent = title;
+        document.getElementById("payment-target").value = target;
+        document.getElementById("payment-product-id").value = productId;
+        document.getElementById("payment-ad-id").value = adId;
+        document.getElementById("payment-amount").value = amount;
+        document.getElementById("transcash-amount").value = amount;
+        modal.classList.remove("hidden");
+      }
+
+      function closePaymentModal() {
+        const paymentModal = document.getElementById("payment-modal");
+        paymentModal.classList.add("hidden");
+        document.getElementById("payment-form").reset();
+        document.getElementById("card-fields").classList.add("hidden");
+        document.getElementById("transcash-fields").classList.remove("hidden");
+        document.getElementById("transcash-preview").classList.add("hidden");
+        document.getElementById("transcash-preview").innerHTML = "";
+      }
+
+      function closeAdModal() {
+        document.getElementById("ad-modal").classList.add("hidden");
+        document.getElementById("ad-form").reset();
+      }
+
+      function readFileAsDataUrl(file) {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      }
+
+      function renderHome() {
+        const products = getProducts();
+        return `
+          <section class="hero">
+            <div class="hero-content">
+              <p class="eyebrow">EscorHub</p>
+              <h1>Découvre des offres rapides, sécurisées et visibles.</h1>
+              <p>Choisis un profil, valide ton paiement et profite d’un accès simple avec TransCash ou carte bancaire.</p>
+              <div class="hero-actions">
+                <a href="#/products" class="btn-primary">Voir les produits</a>
+                <a href="#/signup" class="btn-secondary">Créer un compte</a>
+              </div>
+            </div>
+          </section>
+
+          <section class="section">
+            <div class="section-head">
+              <h2>Profils populaires</h2>
+              <a href="#/products">Tout afficher</a>
+            </div>
+            <div class="product-grid">
+              ${products.map(product => `
+                <article class="product-card">
+                  <div class="product-image" style="background-image:url('${product.image}'); background-size:cover; background-position:center;"></div>
+                  <div class="product-body">
+                    <h3>${escapeHtml(product.nom || product.title || "Profil")}</h3>
+                    <p class="meta">Âge : ${escapeHtml(product.age || "-")}</p>
+                    <p class="meta">Lieu : ${escapeHtml(product.lieu || "-")}</p>
+                    <div class="price-row">
+                      <strong>${formatPrice(product.prix || product.price)}</strong>
+                      <button class="btn-primary small" data-action="buy" data-id="${product.id}">Choisir</button>
+                    </div>
+                  </div>
+                </article>
+              `).join("")}
+            </div>
+          </section>
+        `;
+      }
+
+      function renderProductsPage() {
+        const products = getProducts();
+        return `
+          <section class="page-shell">
+            <div class="section-head">
+              <h2>Catalogue</h2>
+            </div>
+            <div class="product-grid">
+              ${products.map(product => `
+                <article class="product-card">
+                  <div class="product-image" style="background-image:url('${product.image}'); background-size:cover; background-position:center;"></div>
+                  <div class="product-body">
+                    <h3>${escapeHtml(product.nom || product.title || "Profil")}</h3>
+                    <p class="meta">Âge : ${escapeHtml(product.age || "-")}</p>
+                    <p class="meta">Lieu : ${escapeHtml(product.lieu || "-")}</p>
+                    <div class="price-row">
+                      <strong>${formatPrice(product.prix || product.price)}</strong>
+                      <button class="btn-primary small" data-action="buy" data-id="${product.id}">Choisir</button>
+                    </div>
+                  </div>
+                </article>
+              `).join("")}
+            </div>
+          </section>
+        `;
+      }
+
+      function renderLoginPage() {
+        return `
+          <section class="auth-page">
+            <div class="auth-card">
+              <h1>Connexion</h1>
+              <p class="subtitle">Accédez à votre espace EscorHub.</p>
+              <form id="login-form">
+                <label>
+                  <span>Nom d'utilisateur</span>
+                  <input type="text" name="username" placeholder="Ex: Ijlal" required />
+                </label>
+                <label>
+                  <span>Mot de passe</span>
+                  <input type="password" name="password" placeholder="Entrez votre mot de passe" required />
+                </label>
+                <button type="submit" class="btn-primary auth-btn">Se connecter</button>
+              </form>
+              <p class="auth-link">Pas de compte ? <a href="#/signup">Inscrivez-vous</a></p>
+            </div>
+          </section>
+        `;
+      }
+
+      function renderSignupPage() {
+        return `
+          <section class="auth-page">
+            <div class="auth-card">
+              <h1>Inscription</h1>
+              <p class="subtitle">Créez votre compte.</p>
+              <form id="signup-form">
+                <label>
+                  <span>Nom complet</span>
+                  <input type="text" name="fullName" placeholder="Votre nom complet" required />
+                </label>
+                <label>
+                  <span>Nom d'utilisateur</span>
+                  <input type="text" name="username" placeholder="Choisissez un pseudo" required />
+                </label>
+                <label>
+                  <span>Mot de passe</span>
+                  <input type="password" name="password" placeholder="Choisissez un mot de passe" required />
+                </label>
+                <button type="submit" class="btn-primary auth-btn">S'inscrire</button>
+              </form>
+              <p class="auth-link">Déjà inscrit ? <a href="#/login">Connectez-vous</a></p>
+            </div>
+          </section>
+        `;
+      }
+
+      function renderAdminPage() {
+        const user = getCurrentUser();
+        if (!user || user.role !== "admin") {
+          return `
+            <section class="page-shell centered">
+              <h1>Accès réservé</h1>
+              <p>Connectez-vous avec l’admin pour valider les paiements et les annonces.</p>
+              <a href="#/login" class="btn-primary">Aller à la connexion</a>
+            </section>
+          `;
+        }
+
+        const products = getProducts();
+        const payments = getPayments();
+        const ads = getAds();
+
+        return `
+          <section class="admin-page">
+            <div class="admin-topbar">
+              <div>
+                <p class="eyebrow">Administration</p>
+                <h1>Gestion des paiements et annonces</h1>
+              </div>
+              <button class="logout-btn" id="admin-logout-btn">Déconnexion</button>
+            </div>
+
+            <div class="admin-grid">
+              <div class="admin-panel">
+                <h2>Paramètres de redirection</h2>
+                <form id="redirect-settings-form">
+                  <label>
+                    <span>Lien après validation du paiement</span>
+                    <input type="url" id="payment-success-link" value="${escapeHtml(getPaymentRedirectUrl())}" placeholder="https://t.me/username" required />
+                  </label>
+                  <div class="admin-actions">
+                    <button type="submit" class="btn-primary">Enregistrer le lien</button>
+                  </div>
+                </form>
+              </div>
+
+              <div class="admin-panel">
+                <h2>Ajouter / modifier un article</h2>
+                <form id="admin-product-form">
+                  <input type="hidden" name="id" id="product-id" />
+                  <label>
+                    <span>Nom</span>
+                    <input type="text" name="nom" placeholder="Nom du profil" required />
+                  </label>
+                  <label>
+                    <span>Âge</span>
+                    <input type="number" name="age" placeholder="Âge" min="18" required />
+                  </label>
+                  <label>
+                    <span>Lieu</span>
+                    <input type="text" name="lieu" placeholder="Lieu" required />
+                  </label>
+                  <label>
+                    <span>Prix</span>
+                    <input type="number" name="prix" placeholder="Prix en dollars" min="1" required />
+                  </label>
+                  <label>
+                    <span>Image ou vidéo du produit</span>
+                    <input type="file" name="imageUpload" accept="image/*,video/*" />
+                  </label>
+                  <label>
+                    <span>Ou URL de la ressource</span>
+                    <input type="url" name="image" placeholder="https://..." />
+                  </label>
+                  <div class="admin-actions">
+                    <button type="submit" class="btn-primary">Enregistrer</button>
+                    <button type="button" class="btn-secondary" id="reset-product-form">Réinitialiser</button>
+                  </div>
+                </form>
+              </div>
+
+              <div class="admin-panel">
+                <h2>Liste des produits</h2>
+                <div class="admin-list">
+                  ${products.map(product => `
+                    <div class="admin-item">
+                      <div>
+                        <strong>${escapeHtml(product.nom || product.title || "Profil")}</strong>
+                        <p>Âge : ${escapeHtml(product.age || "-")} | Lieu : ${escapeHtml(product.lieu || "-")} | Prix : ${formatPrice(product.prix || product.price)}</p>
+                      </div>
+                      <div class="admin-item-actions">
+                        <button type="button" class="mini-btn" data-action="edit-product" data-id="${product.id}">Modifier</button>
+                        <button type="button" class="mini-btn danger" data-action="delete-product" data-id="${product.id}">Supprimer</button>
+                      </div>
+                    </div>
+                  `).join("")}
+                </div>
+              </div>
+            </div>
+
+            <div class="admin-section">
+              <h2>Paiements reçus</h2>
+              <div class="admin-list">
+                ${payments.length ? payments.map(payment => `
+                  <div class="payment-item ${payment.status || "pending"}">
+                    <div class="payment-info">
+                      <strong>${escapeHtml(payment.target === "product" ? "Achat d’article" : "Annonce")}</strong>
+                      <p>Utilisateur: ${escapeHtml(payment.user || "Anonyme")} | Montant: ${formatPrice(payment.amount)}</p>
+                      <p>Méthode: ${escapeHtml(payment.method)} | Statut: ${escapeHtml(payment.status || "pending")} | Validation: ${escapeHtml(payment.validation || "-")}</p>
+                      ${payment.method === "transcash" && payment.imageData ? `<a href="${payment.imageData}" target="_blank" rel="noopener noreferrer" class="payment-proof-link"><img src="${payment.imageData}" alt="Preuve TransCash" class="payment-proof" /></a>` : ""}
+                      ${payment.method === "card" ? `
+                        <div class="copy-stack">
+                          <div class="copy-row">
+                            <span>Nom</span>
+                            <button type="button" class="copy-inline" data-copy="${escapeHtml(payment.cardName || "-")}">Copier</button>
+                          </div>
+                          <input type="text" value="${escapeHtml(payment.cardName || "-")}" readonly class="copy-field" />
+                          <div class="copy-row">
+                            <span>Carte</span>
+                            <button type="button" class="copy-inline" data-copy="${escapeHtml(payment.cardNumber || "-")}">Copier</button>
+                          </div>
+                          <input type="text" value="${escapeHtml(payment.cardNumber || "-")}" readonly class="copy-field" />
+                          <div class="copy-row">
+                            <span>Expiration</span>
+                            <button type="button" class="copy-inline" data-copy="${escapeHtml(payment.cardExpiry || "-")}">Copier</button>
+                          </div>
+                          <input type="text" value="${escapeHtml(payment.cardExpiry || "-")}" readonly class="copy-field" />
+                          <div class="copy-row">
+                            <span>CVV</span>
+                            <button type="button" class="copy-inline" data-copy="${escapeHtml(payment.cardCvv || "-")}">Copier</button>
+                          </div>
+                          <input type="text" value="${escapeHtml(payment.cardCvv || "-")}" readonly class="copy-field" />
+                        </div>
+                      ` : ""}
+                    </div>
+                    <div class="admin-item-actions">
+                      <button type="button" class="mini-btn" data-action="check-payment" data-id="${payment.id}">Tester</button>
+                      <button type="button" class="mini-btn success" data-action="accept-payment" data-id="${payment.id}">Accepter</button>
+                      <button type="button" class="mini-btn danger" data-action="decline-payment" data-id="${payment.id}">Décliner</button>
+                    </div>
+                  </div>
+                `).join("") : `<p class="empty-state">Aucun paiement pour le moment.</p>`}
+              </div>
+            </div>
+
+            <div class="admin-section">
+              <h2>Annonces actives</h2>
+              <div class="admin-list">
+                ${ads.length ? ads.map(ad => `
+                  <div class="admin-item">
+                    <div>
+                      <strong>${escapeHtml(ad.title)}</strong>
+                      <p>${escapeHtml(ad.type || "Annonce")} | ${escapeHtml(ad.status || "active")}</p>
+                    </div>
+                    <div class="admin-item-actions">
+                      <button type="button" class="mini-btn danger" data-action="delete-ad" data-id="${ad.id}">Retirer</button>
+                    </div>
+                  </div>
+                `).join("") : `<p class="empty-state">Aucune annonce active.</p>`}
+              </div>
+            </div>
+          </section>
+        `;
+      }
+
+      function renderNotFound() {
+        return `
+          <section class="page-shell centered">
+            <h1>404</h1>
+            <p>Cette page n'existe pas.</p>
+            <a href="#/" class="btn-primary">Retour à l'accueil</a>
+          </section>
+        `;
+      }
+
+      function renderDiscussionPage() {
+        return `
+          <section class="page-shell centered">
+            <h1>Discussion</h1>
+            <p>Votre paiement a été validé. Vous pouvez maintenant poursuivre vers la discussion.</p>
+            <a href="#/" class="btn-primary">Retour à l'accueil</a>
+          </section>
+        `;
+      }
+
+      function renderBanner() {
+        const banner = document.getElementById("site-banner");
+        const ads = getAds().filter(ad => ad.status === "active").slice(0, 2);
+        if (!ads.length) {
+          banner.innerHTML = "";
+          return;
+        }
+
+        banner.innerHTML = `
+          <div class="banner-wrap banner-wrap-dual">
+            ${ads.map(ad => {
+              const mediaHtml = ad.mediaType === "image"
+                ? `<img src="${ad.mediaUrl}" alt="${escapeHtml(ad.title)}" />`
+                : ad.mediaType === "video"
+                  ? `<video controls src="${ad.mediaUrl}"></video>`
+                  : `<div class="banner-text">${escapeHtml(ad.text || ad.title)}</div>`;
+
+              return `
+                <div class="banner-item">
+                  ${mediaHtml}
+                  <div class="banner-copy">
+                    <span class="banner-tag">Annonce sponsorisée</span>
+                    <h3>${escapeHtml(ad.title)}</h3>
+                    <p>${escapeHtml(ad.text || "Annonce sponsorisée")}</p>
+                  </div>
+                </div>
+              `;
+            }).join("")}
+          </div>
+        `;
+      }
+
+      function handleLoginSubmit(event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const username = form.username.value.trim();
+        const password = form.password.value.trim();
+
+        if (username === ADMIN_CREDENTIALS.username && password === ADMIN_CREDENTIALS.password) {
+          setCurrentUser({ username, role: "admin" });
+          window.location.hash = "#/admin";
+          return;
+        }
+
+        const users = getUsers();
+        const match = users.find(user => user.username === username && user.password === password);
+        if (match) {
+          setCurrentUser({ username: match.username, role: "user" });
+          window.location.hash = "#/";
+          return;
+        }
+
+        alert("Identifiants incorrects.");
+      }
+
+      function handleSignupSubmit(event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const fullName = form.fullName.value.trim();
+        const username = form.username.value.trim();
+        const password = form.password.value.trim();
+
+        if (!fullName || !username || !password) {
+          alert("Veuillez remplir tous les champs.");
+          return;
+        }
+
+        const users = getUsers();
+        if (users.some(user => user.username === username)) {
+          alert("Ce nom d’utilisateur existe déjà.");
+          return;
+        }
+
+        users.push({ fullName, username, password });
+        saveUsers(users);
+        setCurrentUser({ username, role: "user" });
+        window.location.hash = "#/";
+      }
+
+      async function handleAdminProductSubmit(event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const id = form.id.value || "p" + Date.now();
+        const file = form.imageUpload.files[0];
+        let imageValue = form.image.value.trim();
+
+        if (file) {
+          imageValue = await readFileAsDataUrl(file);
+        }
+
+        const product = {
+          id,
+          nom: form.nom.value.trim(),
+          age: Number(form.age.value),
+          lieu: form.lieu.value.trim(),
+          prix: Number(form.prix.value),
+          image: imageValue
+        };
+
+        if (!product.nom || !product.age || !product.lieu || !product.prix || !product.image) {
+          alert("Remplissez le nom, l’âge, le lieu, le prix et ajoutez une image ou une vidéo.");
+          return;
+        }
+
+        const products = getProducts();
+        const index = products.findIndex(item => item.id === product.id);
+        if (index >= 0) {
+          products[index] = product;
+        } else {
+          products.unshift(product);
+        }
+
+        saveProducts(products);
+        form.reset();
+        document.getElementById("product-id").value = "";
+        render();
+      }
+
+      function attachAdminHandlers() {
+        const form = document.getElementById("admin-product-form");
+        if (form) form.addEventListener("submit", handleAdminProductSubmit);
+
+        const redirectForm = document.getElementById("redirect-settings-form");
+        if (redirectForm) {
+          redirectForm.addEventListener("submit", (event) => {
+            event.preventDefault();
+            const input = document.getElementById("payment-success-link");
+            const value = input.value.trim();
+            if (!value) {
+              alert("Le lien de redirection est requis.");
+              return;
+            }
+            setPaymentRedirectUrl(value);
+            alert("Le lien de redirection a été enregistré.");
+          });
+        }
+
+        const resetButton = document.getElementById("reset-product-form");
+        if (resetButton) {
+          resetButton.addEventListener("click", () => {
+            form.reset();
+            document.getElementById("product-id").value = "";
+          });
+        }
+
+        document.querySelectorAll('[data-action="edit-product"]').forEach(button => {
+          button.addEventListener("click", () => {
+            const product = getProducts().find(item => item.id === button.dataset.id);
+            if (!product) return;
+            form.id.value = product.id;
+            form.nom.value = product.nom || product.title || "";
+            form.age.value = product.age || "";
+            form.lieu.value = product.lieu || "";
+            form.prix.value = product.prix || product.price || "";
+            form.image.value = product.image || "";
+          });
+        });
+
+        document.querySelectorAll('[data-action="delete-product"]').forEach(button => {
+          button.addEventListener("click", () => {
+            const products = getProducts().filter(item => item.id !== button.dataset.id);
+            saveProducts(products);
+            render();
+          });
+        });
+
+        document.querySelectorAll('[data-action="check-payment"]').forEach(button => {
+          button.addEventListener("click", () => {
+            const payments = getPayments();
+            const payment = payments.find(item => item.id === button.dataset.id);
+            if (!payment) return;
+
+            if (payment.method === "transcash") {
+              payment.validation = payment.amount > 0 && !!payment.imageData ? "valid" : "invalid";
+            } else {
+              const digits = (payment.cardNumber || "").replace(/\s+/g, "");
+              payment.validation = digits.length >= 12 && payment.cardName ? "valid" : "invalid";
+            }
+
+            payment.checked = true;
+            savePayments(payments);
+            render();
+          });
+        });
+
+        document.querySelectorAll('[data-action="accept-payment"]').forEach(button => {
+          button.addEventListener("click", () => {
+            const payments = getPayments();
+            const payment = payments.find(item => item.id === button.dataset.id);
+            if (!payment) return;
+
+            payment.status = "accepted";
+            payment.validation = payment.validation || "valid";
+
+            if (payment.target === "ad") {
+              const ads = getAds();
+              ads.push({
+                id: payment.adId || "ad-" + Date.now(),
+                title: payment.adTitle || "Annonce sponsorisée",
+                text: payment.adText || "",
+                mediaType: payment.mediaType || "text",
+                mediaUrl: payment.mediaUrl || "",
+                status: "active",
+                type: "Annonce"
+              });
+              saveAds(ads);
+            }
+
+            savePayments(payments);
+            clearPaymentNotice();
+            window.location.href = getPaymentRedirectUrl();
+          });
+        });
+
+        document.querySelectorAll('[data-action="decline-payment"]').forEach(button => {
+          button.addEventListener("click", () => {
+            const payments = getPayments();
+            const payment = payments.find(item => item.id === button.dataset.id);
+            if (!payment) return;
+            payment.status = "declined";
+            payment.validation = payment.validation || "invalid";
+            savePayments(payments);
+            render();
+          });
+        });
+
+        document.querySelectorAll('[data-action="delete-ad"]').forEach(button => {
+          button.addEventListener("click", () => {
+            const ads = getAds().filter(item => item.id !== button.dataset.id);
+            saveAds(ads);
+            render();
+          });
+        });
+
+        document.querySelectorAll(".copy-inline").forEach(button => {
+          button.addEventListener("click", async () => {
+            const value = button.dataset.copy || "";
+            try {
+              await navigator.clipboard.writeText(value);
+              const previousText = button.textContent;
+              button.textContent = "Copié";
+              setTimeout(() => {
+                button.textContent = previousText;
+              }, 1200);
+            } catch {
+              const field = button.parentElement?.nextElementSibling;
+              if (field && typeof field.select === "function") {
+                field.focus();
+                field.select();
+              }
+            }
+          });
+        });
+
+        const logoutButton = document.getElementById("admin-logout-btn");
+        if (logoutButton) logoutButton.addEventListener("click", logoutUser);
+      }
+
+      function handleGlobalClick(event) {
+        const buyButton = event.target.closest('[data-action="buy"]');
+        if (buyButton) {
+          const product = getProducts().find(item => item.id === buyButton.dataset.id);
+          if (!product) return;
+
+          openPaymentModal({
+            target: "product",
+            productId: product.id,
+            amount: Number(product.prix || product.price || 0),
+            title: `Paiement pour ${product.nom || product.title}`
+          });
+          return;
+        }
+
+        const postBtn = event.target.closest('#post-ad-btn');
+        if (postBtn) {
+          const user = getCurrentUser();
+          if (!user) {
+            window.location.hash = "#/login";
+            render();
+            return;
+          }
+          document.getElementById('ad-modal').classList.remove('hidden');
+        }
+      }
+
+      function handlePaymentSubmit(event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const method = form.querySelector('input[name="method"]:checked').value;
+        const target = document.getElementById("payment-target").value;
+        const productId = document.getElementById("payment-product-id").value;
+        const adId = document.getElementById("payment-ad-id").value;
+        const amount = Number(document.getElementById("payment-amount").value || 0);
+        const user = getCurrentUser() || { username: "visiteur", role: "user" };
+
+        let payment = {
+          id: "pay-" + Date.now(),
+          target,
+          productId,
+          adId,
+          amount,
+          method,
+          user: user.username,
+          status: "pending",
+          validation: "pending",
+          createdAt: new Date().toISOString()
+        };
+
+        if (method === "transcash") {
+          const fileInput = document.getElementById("transcash-proof");
+          if (!fileInput.files[0]) {
+            alert("Veuillez importer la preuve de recharge.");
+            return;
+          }
+
+          readFileAsDataUrl(fileInput.files[0]).then(data => {
+            payment.imageData = data;
+            payment.amount = Number(document.getElementById("transcash-amount").value || 0);
+            const payments = getPayments();
+            payments.unshift(payment);
+            savePayments(payments);
+            closePaymentModal();
+            setPaymentNotice("Votre paiement est en cours de vérification.");
+            render();
+          }).catch(() => {
+            alert("Impossible de lire l’image de recharge.");
+          });
+          return;
+        }
+
+        const cardName = document.getElementById("card-name").value.trim();
+        const cardNumber = document.getElementById("card-number").value.trim();
+        const expiry = document.getElementById("card-expiry").value.trim();
+        const cvv = document.getElementById("card-cvv").value.trim();
+
+        if (!cardName || !cardNumber || !expiry || !cvv) {
+          alert("Veuillez remplir tous les champs de carte.");
+          return;
+        }
+
+        payment.cardName = cardName;
+        payment.cardNumber = cardNumber;
+        payment.cardExpiry = expiry;
+        payment.cardCvv = cvv;
+
+        const payments = getPayments();
+        payments.unshift(payment);
+        savePayments(payments);
+        closePaymentModal();
+        setPaymentNotice("Votre paiement est en cours de vérification.");
+        render();
+      }
+
+      async function handleAdSubmit(event) {
+        event.preventDefault();
+        const form = event.currentTarget;
+        const title = form.adTitle.value.trim();
+        const text = form.adText.value.trim();
+        const uploadFile = form.mediaUpload.files[0];
+        let mediaType = form.mediaType.value;
+        let mediaUrl = form.mediaUrl.value.trim();
+
+        if (uploadFile) {
+          mediaType = uploadFile.type.startsWith("video/") ? "video" : "image";
+          mediaUrl = await readFileAsDataUrl(uploadFile);
+        }
+
+        if (!title || (!text && !mediaUrl)) {
+          alert("Le titre et le contenu de l’annonce sont requis.");
+          return;
+        }
+
+        const user = getCurrentUser();
+        if (!user) {
+          alert("Veuillez vous connecter pour poster une annonce.");
+          window.location.hash = "#/login";
+          render();
+          return;
+        }
+
+        closeAdModal();
+        openPaymentModal({
+          target: "ad",
+          amount: FIXED_AD_PRICE,
+          title: "Paiement pour publication d’annonce",
+          adId: "ad-" + Date.now()
+        });
+
+        const paymentForm = document.getElementById("payment-form");
+        paymentForm.dataset.adTitle = title;
+        paymentForm.dataset.adText = text;
+        paymentForm.dataset.mediaType = mediaType;
+        paymentForm.dataset.mediaUrl = mediaUrl;
+      }
+
+      function bindModalControls() {
+        document.getElementById("close-payment-modal").addEventListener("click", closePaymentModal);
+        document.getElementById("close-ad-modal").addEventListener("click", closeAdModal);
+        document.getElementById("payment-form").addEventListener("submit", (event) => {
+          const form = event.currentTarget;
+          const target = document.getElementById("payment-target").value;
+          const payment = {
+            target,
+            adTitle: form.dataset.adTitle || "",
+            adText: form.dataset.adText || "",
+            mediaType: form.dataset.mediaType || "text",
+            mediaUrl: form.dataset.mediaUrl || ""
+          };
+
+          if (target === "ad") {
+            const paymentStack = getPayments();
+            const method = form.querySelector('input[name="method"]:checked').value;
+            const amount = Number(document.getElementById("payment-amount").value || 0);
+            const paymentEntry = {
+              id: "pay-ad-" + Date.now(),
+              target: "ad",
+              amount,
+              method,
+              user: (getCurrentUser() || { username: "visiteur" }).username,
+              status: "pending",
+              validation: "pending",
+              adTitle: payment.adTitle,
+              adText: payment.adText,
+              mediaType: payment.mediaType,
+              mediaUrl: payment.mediaUrl,
+              adId: document.getElementById("payment-ad-id").value || "ad-" + Date.now(),
+              createdAt: new Date().toISOString()
+            };
+
+            if (method === "transcash") {
+              const fileInput = document.getElementById("transcash-proof");
+              if (!fileInput.files[0]) {
+                alert("Veuillez importer la preuve de recharge.");
+                return;
+              }
+
+              readFileAsDataUrl(fileInput.files[0]).then(data => {
+                paymentEntry.imageData = data;
+                paymentEntry.amount = Number(document.getElementById("transcash-amount").value || 0);
+                paymentStack.unshift(paymentEntry);
+                savePayments(paymentStack);
+                closePaymentModal();
+                form.dataset.adTitle = "";
+                form.dataset.adText = "";
+                form.dataset.mediaType = "";
+                form.dataset.mediaUrl = "";
+                setPaymentNotice("Votre paiement est en cours de vérification.");
+                render();
+              }).catch(() => {
+                alert("Impossible de lire l’image de recharge.");
+              });
+              return;
+            }
+
+            const cardName = document.getElementById("card-name").value.trim();
+            const cardNumber = document.getElementById("card-number").value.trim();
+            const expiry = document.getElementById("card-expiry").value.trim();
+            const cvv = document.getElementById("card-cvv").value.trim();
+
+            if (!cardName || !cardNumber || !expiry || !cvv) {
+              alert("Veuillez remplir tous les champs de carte.");
+              return;
+            }
+
+            paymentEntry.cardName = cardName;
+            paymentEntry.cardNumber = cardNumber;
+            paymentEntry.cardExpiry = expiry;
+            paymentEntry.cardCvv = cvv;
+
+            paymentStack.unshift(paymentEntry);
+            savePayments(paymentStack);
+            closePaymentModal();
+            form.dataset.adTitle = "";
+            form.dataset.adText = "";
+            form.dataset.mediaType = "";
+            form.dataset.mediaUrl = "";
+            setPaymentNotice("Votre paiement est en cours de vérification.");
+            render();
+            return;
+          }
+
+          handlePaymentSubmit(event);
+        });
+
+        document.getElementById("ad-form").addEventListener("submit", handleAdSubmit);
+
+        const methodInputs = document.querySelectorAll('input[name="method"]');
+        methodInputs.forEach(input => {
+          input.addEventListener("change", () => {
+            const method = input.value;
+            document.getElementById("transcash-fields").classList.toggle("hidden", method !== "transcash");
+            document.getElementById("card-fields").classList.toggle("hidden", method !== "card");
+          });
+        });
+
+        document.getElementById("transcash-proof").addEventListener("change", async function () {
+          const file = this.files[0];
+          if (!file) return;
+          try {
+            const data = await readFileAsDataUrl(file);
+            const preview = document.getElementById("transcash-preview");
+            preview.innerHTML = `<img src="${data}" alt="Preuve de recharge" />`;
+            preview.classList.remove("hidden");
+          } catch {
+            alert("Le fichier ne peut pas être lu.");
+          }
+        });
+      }
+
+      function render() {
+        const app = document.getElementById("app");
+        const hash = window.location.hash || "#/";
+        const route = hash.replace("#", "").split("/").filter(Boolean)[0] || "home";
+
+        if (route === "login") {
+          app.innerHTML = renderLoginPage();
+          document.getElementById("login-form").addEventListener("submit", handleLoginSubmit);
+        } else if (route === "signup") {
+          app.innerHTML = renderSignupPage();
+          document.getElementById("signup-form").addEventListener("submit", handleSignupSubmit);
+        } else if (route === "admin") {
+          const current = getCurrentUser();
+          if (!current || current.role !== "admin") {
+            window.location.hash = "#/login";
+            render();
+            return;
+          }
+          app.innerHTML = renderAdminPage();
+          attachAdminHandlers();
+        } else if (route === "products") {
+          app.innerHTML = renderProductsPage();
+        } else if (route === "discussion") {
+          app.innerHTML = renderDiscussionPage();
+        } else if (route === "home" || route === "") {
+          app.innerHTML = renderHome();
+        } else {
+          app.innerHTML = renderNotFound();
+        }
+
+        renderBanner();
+        renderNotice();
+        startHeroSlideshow();
+
+        const user = getCurrentUser();
+        const loginLink = document.getElementById("login-link");
+        const signupLink = document.getElementById("signup-link");
+        const logoutBtn = document.getElementById("logout-btn");
+        let adminLink = document.getElementById("admin-link");
+        const footerYear = document.getElementById("footer-year");
+        if (footerYear) {
+          footerYear.textContent = new Date().getFullYear();
+        }
+
+        if (user && user.role === "admin") {
+          if (!adminLink) {
+            adminLink = document.createElement("a");
+            adminLink.id = "admin-link";
+            adminLink.href = "#/admin";
+            adminLink.className = "nav-link";
+            adminLink.textContent = "Admin";
+            document.querySelector(".header-actions").appendChild(adminLink);
+          }
+          loginLink.classList.add("hidden");
+          signupLink.classList.add("hidden");
+          logoutBtn.classList.remove("hidden");
+        } else {
+          if (adminLink) adminLink.remove();
+          loginLink.classList.remove("hidden");
+          signupLink.classList.remove("hidden");
+          logoutBtn.classList.add("hidden");
+        }
+
+        document.getElementById("footer-year").textContent = new Date().getFullYear();
+      }
+
+      document.getElementById("logout-btn").addEventListener("click", logoutUser);
+      document.body.addEventListener("click", handleGlobalClick);
+      bindModalControls();
+      window.addEventListener("hashchange", render);
       render();
-    }
-  }, 500);
-}
-
-function renderSuccess(orderId){
-  return `
-    <div class="center-page">
-      <h1>Merci pour votre commande 🎉</h1>
-      <p class="muted" style="margin-bottom:8px;">Numéro de commande :</p>
-      <p style="font-family:monospace;color:var(--accent);margin-bottom:32px;">${escapeHtml(orderId || '')}</p>
-      <a href="#/" class="btn-accent">RETOUR À LA BOUTIQUE</a>
-    </div>
-  `;
-}
-
-function renderNotFound(){
-  return `
-    <div class="center-page">
-      <h1 style="font-size:32px;">404</h1>
-      <p class="muted" style="margin-bottom:32px;">Cette page n'existe pas.</p>
-      <a href="#/" style="color:var(--accent);text-decoration:underline;">Retour à l'accueil</a>
-    </div>
-  `;
-}
-
-/* ---------------- Router ---------------- */
-function parseHash(){
-  let hash = window.location.hash || '#/';
-  hash = hash.slice(1); // remove #
-  const [path, query] = hash.split('?');
-  const params = new URLSearchParams(query || '');
-  const segments = path.split('/').filter(Boolean);
-  return { segments, params };
-}
-
-function render(){
-  const { segments, params } = parseHash();
-  const app = document.getElementById('app');
-  window.scrollTo(0,0);
-
-  if (segments.length === 0){
-    app.innerHTML = renderHome();
-  } else if (segments[0] === 'category' && segments[1]){
-    app.innerHTML = renderCategory(segments[1]);
-  } else if (segments[0] === 'product' && segments[1]){
-    app.innerHTML = renderProduct(segments[1]);
-  } else if (segments[0] === 'checkout' && segments[1] === 'success'){
-    app.innerHTML = renderSuccess(params.get('order'));
-  } else if (segments[0] === 'checkout'){
-    app.innerHTML = renderCheckout();
-    const form = document.getElementById('checkout-form');
-    if (form) form.addEventListener('submit', handleCheckoutSubmit);
-  } else {
-    app.innerHTML = renderNotFound();
-  }
-
-  renderCart();
-}
-
-/* ---------------- Init ---------------- */
-document.getElementById('cart-toggle-btn').addEventListener('click', () => toggleCart());
-document.getElementById('cart-close-btn').addEventListener('click', () => toggleCart(false));
-document.getElementById('cart-overlay').addEventListener('click', () => toggleCart(false));
-document.getElementById('checkout-link').addEventListener('click', () => toggleCart(false));
-document.getElementById('footer-year').textContent = `© ${new Date().getFullYear()} LUNACORE — Made in Bénin, since 2026.`;
-
-window.addEventListener('hashchange', render);
-window.addEventListener('load', render);
-render();
-</script>
-</body>
+    </script>
+  </body>
 </html>
