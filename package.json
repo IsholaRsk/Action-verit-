@@ -1,0 +1,21 @@
+{
+  "name": "escorthub-supabase",
+  "version": "2.0.0",
+  "private": true,
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "create-admin": "node scripts/create-admin.js",
+    "setup-supabase": "echo 'Execute supabase/schema.sql dans SQL Editor Supabase'"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "ws": "^8.21.3"
+  }
+}

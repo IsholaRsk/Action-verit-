@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Poster une annonce - EscortHub</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+  <!-- Icônes importées professionnelles - Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0/+esm"
+    }
+  }
+  </script>
+  <style>
+    .post-container { max-width: 1280px; margin: 0 auto; padding: 24px; min-height: 70vh; }
+    .post-breadcrumb { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.85rem; margin-bottom: 20px; flex-wrap: wrap; }
+    .post-breadcrumb a { color: var(--muted); }
+    .post-breadcrumb a:hover { color: var(--accent); }
+    .post-breadcrumb span.sep { opacity: .4; }
+    .post-steps { display: flex; gap: 0; margin-bottom: 32px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+    .post-step { flex: 1; padding: 14px 16px; text-align: center; font-size: 0.85rem; font-weight: 700; color: var(--muted); border-right: 1px solid var(--line); background: transparent; transition: all .2s; display:flex;align-items:center;justify-content:center;gap:8px }
+    .post-step:last-child { border-right: none; }
+    .post-step.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #111; }
+    .post-step.done { background: rgba(78,203,113,0.15); color: var(--success); }
+    .post-card { background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 28px; margin-bottom: 24px; }
+    .post-card h1 { margin: 0 0 8px; font-size: 1.8rem; font-weight: 900; display:flex;align-items:center;gap:12px }
+    .post-card .subtitle { color: var(--muted); margin: 0 0 24px; font-size: 0.95rem; }
+    .location-section { margin-bottom: 32px; }
+    .location-section h2 { font-size: 1.05rem; font-weight: 800; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid var(--line); color: var(--accent-2); text-transform: uppercase; letter-spacing: 0.06em; display:flex;align-items:center;gap:10px }
+    .location-section h2 i { color: var(--accent); }
+    .city-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px; }
+    .city-link { display: flex; flex-direction: column; padding: 10px 14px; background: var(--panel-soft); border: 1px solid var(--line); border-radius: 8px; color: var(--text); font-size: 0.9rem; font-weight: 500; transition: all .15s; cursor: pointer; text-align: left; }
+    .city-link:hover { background: var(--panel-hover); border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+    .city-link.selected { background: var(--accent); color: #111; border-color: var(--accent); font-weight: 800; }
+    .city-link small { display: block; color: var(--muted); font-size: 0.75rem; margin-top: 2px; }
+    .city-link.selected small { color: rgba(0,0,0,0.6); }
+    .category-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+    .category-card { background: var(--panel-soft); border: 1px solid var(--line); border-radius: 12px; padding: 18px; cursor: pointer; transition: all .2s; }
+    .category-card:hover { border-color: var(--accent); background: var(--panel-hover); transform: translateY(-2px); }
+    .category-card.selected { border-color: var(--accent); background: rgba(255,138,0,0.12); }
+    .category-card h3 { margin: 0 0 6px; font-size: 1rem; font-weight: 800; }
+    .category-card p { margin: 0; color: var(--muted); font-size: 0.85rem; line-height: 1.4; }
+    .category-card .icon { font-size: 1.3rem; margin-bottom: 10px; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; background: rgba(255,138,0,0.12); border-radius: 10px; color: var(--accent); }
+    .category-card.selected .icon { background: var(--accent); color: #111; }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-full { grid-column: 1 / -1; }
+    .selected-summary { background: rgba(255,138,0,0.08); border: 1px solid rgba(255,138,0,0.3); border-radius: 10px; padding: 14px 16px; margin-bottom: 20px; display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.9rem; align-items:center }
+    .selected-summary strong { color: var(--accent-2); }
+    .selected-summary i { color: var(--accent); }
+    .search-box { width: 100%; max-width: 480px; margin-bottom: 24px; position: relative; }
+    .search-box input { width: 100%; padding-left: 42px; }
+    .search-box i { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+    .preview-box { background: var(--panel-soft); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-top: 16px; }
+    .preview-box h4 { margin: 0 0 10px; font-size: 0.9rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; display:flex;align-items:center;gap:8px }
+    @keyframes shimmer { 0%{transform:translateX(-100%)} 100%{transform:translateX(100%)} }
+    @keyframes float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+    @keyframes pulseGlow { 0%,100%{box-shadow:0 0 0 0 rgba(255,138,0,0.4)} 50%{box-shadow:0 0 0 12px rgba(255,138,0,0)} }
+    @keyframes slideInRight { from{transform:translateX(100%);opacity:0} to{transform:translateX(0);opacity:1} }
+    @keyframes fadeIn { from{opacity:0} to{opacity:1} }
+    .page-loader { animation: fadeIn .3s ease; }
+    .city-link { position:relative; overflow:hidden; transition: all .2s cubic-bezier(0.4,0,0.2,1); }
+    .city-link::before { content:''; position:absolute; top:0; left:-100%; width:100%; height:100%; background:linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent); transition:left .5s; }
+    .city-link:hover::before { left:100%; }
+    .city-link:hover { transform: translateY(-2px); }
+    .category-card { position:relative; overflow:hidden; transition:all .3s cubic-bezier(0.4,0,0.2,1); }
+    .category-card:hover { transform:translateY(-4px) scale(1.02); box-shadow:0 8px 24px rgba(0,0,0,0.4); }
+    .location-section { animation: slideInRight .5s ease both; }
+    .post-card { animation: slideInRight .4s ease both; }
+    @media (max-width: 700px) { .form-grid { grid-template-columns: 1fr; } .city-grid { grid-template-columns: 1fr 1fr; } .post-steps { flex-direction: column; } .post-step { border-right: none; border-bottom: 1px solid var(--line); } }
+  </style>
+</head>
+<body>
+<div id="page-loader" class="page-loader" style="position:fixed;inset:0;background:#000;z-index:9999;display:grid;place-items:center;transition:opacity .5s">
+  <div style="text-align:center;display:flex;flex-direction:column;gap:16px;align-items:center">
+    <div style="font-size:2rem;font-weight:900;letter-spacing:0.08em;text-transform:uppercase">Escort<span style="color:var(--accent)">Hub</span></div>
+    <div style="font-size:1.5rem;color:var(--accent)"><i class="fa-solid fa-spinner fa-spin"></i></div>
+    <p style="color:var(--muted);font-size:0.9rem">Chargement catalogue mondial...</p>
+  </div>
+</div>
+<div id="toast-container" class="toast-container" style="position:fixed;bottom:20px;right:20px;z-index:300;display:flex;flex-direction:column;gap:10px;pointer-events:none"></div>
+<header class="site-header">
+  <div class="header-inner">
+    <a href="/" class="brand">Escort<span>Hub</span></a>
+    <nav class="main-nav">
+      <a href="/">Accueil</a>
+      <a href="/#products">Catalogue</a>
+      <a href="/post.html" style="color:var(--accent);font-weight:800">Poster Annonce</a>
+    </nav>
+    <div class="header-actions">
+      <a href="/#login" class="nav-link" id="login-link-post">Connexion</a>
+      <a href="/" class="btn-secondary" style="padding:10px 16px"><i class="fa-solid fa-arrow-left" style="margin-right:6px"></i>Retour</a>
+    </div>
+  </div>
+</header>
+
+<div class="post-container">
+  <div class="post-breadcrumb">
+    <a href="/"><i class="fa-solid fa-house" style="margin-right:4px"></i>EscortHub</a><span class="sep">›</span>
+    <a href="/post.html">Poster une annonce</a><span class="sep">›</span>
+    <span id="breadcrumb-current">Choisir localisation</span>
+  </div>
+
+  <div class="post-steps">
+    <div class="post-step active" data-step="1"><i class="fa-solid fa-location-dot"></i><span>1</span> Localisation</div>
+    <div class="post-step" data-step="2"><i class="fa-solid fa-layer-group"></i><span>2</span> Catégorie</div>
+    <div class="post-step" data-step="3"><i class="fa-solid fa-pen-to-square"></i><span>3</span> Détails</div>
+    <div class="post-step" data-step="4"><i class="fa-solid fa-credit-card"></i><span>4</span> Paiement 1$</div>
+  </div>
+
+  <!-- STEP 1 : LOCATION WORLDWIDE -->
+  <div id="step-1" class="post-card">
+    <h1><i class="fa-solid fa-earth-americas" style="color:var(--accent)"></i> Choisissez votre localisation - Monde entier</h1>
+    <p class="subtitle">Catalogue mondial complet - 195 pays, 500+ villes. Sélectionnez la ville où votre annonce sera visible. Aucune position pré-sélectionnée.</p>
+
+    <div class="search-box">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" id="city-search" placeholder="Rechercher une ville ou pays (ex: Paris, New York, Tokyo, Sydney...)" />
+    </div>
+
+    <div id="locations-container">
+      <div style="text-align:center;padding:40px;color:var(--muted)"><i class="fa-solid fa-spinner fa-spin" style="margin-right:8px"></i>Chargement du catalogue mondial...</div>
+    </div>
+  </div>
+
+  <!-- STEP 2 : CATEGORY -->
+  <div id="step-2" class="post-card hidden">
+    <h1><i class="fa-solid fa-layer-group" style="color:var(--accent)"></i> Choisissez une catégorie</h1>
+    <p class="subtitle">Sélectionnez la catégorie qui correspond à votre annonce.</p>
+    <div class="selected-summary" id="selected-location-summary"></div>
+    <div class="category-grid">
+      <div class="category-card" data-category="escorts" data-sub="female">
+        <div class="icon"><i class="fa-solid fa-person-dress"></i></div><h3>Escorts</h3><p>Female escorts, indépendantes, agences. La catégorie la plus populaire.</p>
+      </div>
+      <div class="category-card" data-category="body-rubs" data-sub="massage">
+        <div class="icon"><i class="fa-solid fa-spa"></i></div><h3>Body Rubs</h3><p>Massages érotiques, body rubs, massages tantriques.</p>
+      </div>
+      <div class="category-card" data-category="strippers" data-sub="clubs">
+        <div class="icon"><i class="fa-solid fa-masks-theater"></i></div><h3>Strippers & Strip Clubs</h3><p>Danseuses, strip clubs, lap dance.</p>
+      </div>
+      <div class="category-card" data-category="dom-fetish" data-sub="bdsm">
+        <div class="icon"><i class="fa-solid fa-link"></i></div><h3>Dom & Fetish</h3><p>Domination, fétichisme, BDSM, maîtresses.</p>
+      </div>
+      <div class="category-card" data-category="male-escorts" data-sub="male">
+        <div class="icon"><i class="fa-solid fa-person"></i></div><h3>Male Escorts</h3><p>Escorts hommes pour femmes et couples.</p>
+      </div>
+      <div class="category-card" data-category="trans" data-sub="transsexual">
+        <div class="icon"><i class="fa-solid fa-transgender"></i></div><h3>Transsexual Escorts</h3><p>Escortes transsexuelles, TS, shemales.</p>
+      </div>
+      <div class="category-card" data-category="adult-jobs" data-sub="jobs">
+        <div class="icon"><i class="fa-solid fa-briefcase"></i></div><h3>Adult Jobs</h3><p>Offres d'emploi adultes, recrutement.</p>
+      </div>
+      <div class="category-card" data-category="phone-websites" data-sub="cam">
+        <div class="icon"><i class="fa-solid fa-video"></i></div><h3>Phone & Websites</h3><p>Cam, OnlyFans, services en ligne, téléphone rose.</p>
+      </div>
+    </div>
+    <div style="margin-top:20px;display:flex;gap:12px">
+      <button class="btn-secondary" id="back-to-1"><i class="fa-solid fa-arrow-left" style="margin-right:6px"></i>Retour localisation</button>
+    </div>
+  </div>
+
+  <!-- STEP 3 : DETAILS -->
+  <div id="step-3" class="post-card hidden">
+    <h1><i class="fa-solid fa-pen-to-square" style="color:var(--accent)"></i> Détails de votre annonce</h1>
+    <p class="subtitle">Remplissez les informations. Votre annonce sera visible après paiement de 1$ et validation admin.</p>
+    <div class="selected-summary" id="selected-both-summary"></div>
+
+    <form id="ad-details-form">
+      <div class="form-grid">
+        <label class="form-full"><span>Titre de l'annonce * (max 80 caractères)</span><input type="text" name="title" maxlength="80" placeholder="Ex: Belle blonde 23 ans disponible - Service VIP 24/7" required /></label>
+        <label><span>Âge *</span><input type="number" name="age" min="18" max="99" placeholder="23" required /></label>
+        <label><span>Prix / Tarif *</span><input type="number" name="price" min="1" placeholder="150" required /></label>
+        <label><span><i class="fa-solid fa-phone" style="margin-right:4px"></i>Téléphone / WhatsApp *</span><input type="tel" name="phone" placeholder="+31 6 XX XX XX XX" required /></label>
+        <label><span><i class="fa-solid fa-envelope" style="margin-right:4px"></i>Email</span><input type="email" name="email" placeholder="votre@email.com" /></label>
+        <label class="form-full"><span>Description *</span><textarea name="description" rows="6" placeholder="Décrivez vos services, disponibilités, tarifs, localisation exacte..." required></textarea></label>
+        <label><span><i class="fa-solid fa-image" style="margin-right:4px"></i>Images (max 4)</span><input type="file" name="images" accept="image/*" multiple /></label>
+        <label><span><i class="fa-solid fa-link" style="margin-right:4px"></i>URL image principale</span><input type="url" name="imageUrl" placeholder="https://..." /></label>
+        <label><span>Disponibilité</span>
+          <select name="availability">
+            <option value="24/7">24/7 Disponible</option>
+            <option value="day">Jour seulement</option>
+            <option value="night">Nuit seulement</option>
+            <option value="weekend">Week-end</option>
+            <option value="appointment">Sur RDV</option>
+          </select>
+        </label>
+        <label><span>Langues parlées</span><input type="text" name="languages" placeholder="Français, Anglais, Néerlandais..." /></label>
+        <label class="form-full"><span>Conditions / Règles</span><textarea name="rules" rows="2" placeholder="Ex: Hygiène exigée, respect mutuel..."></textarea></label>
+      </div>
+
+      <div class="preview-box">
+        <h4><i class="fa-solid fa-eye"></i> Aperçu de votre annonce</h4>
+        <div id="ad-preview" style="color:var(--muted);font-size:0.9rem">Remplissez le formulaire pour voir l'aperçu...</div>
+      </div>
+
+      <div style="margin-top:24px;display:flex;gap:12px;flex-wrap:wrap">
+        <button type="button" class="btn-secondary" id="back-to-2"><i class="fa-solid fa-arrow-left" style="margin-right:6px"></i>Retour catégorie</button>
+        <button type="submit" class="btn-primary" style="flex:1"><i class="fa-solid fa-arrow-right" style="margin-right:8px"></i>Continuer vers paiement 1$</button>
+      </div>
+    </form>
+  </div>
+
+  <!-- STEP 4 : PAYMENT -->
+  <div id="step-4" class="post-card hidden">
+    <h1><i class="fa-solid fa-credit-card" style="color:var(--accent)"></i> Paiement & Publication - 1$</h1>
+    <p class="subtitle">Votre annonce est prête. Paiement unique de 1$ pour publication.</p>
+    <div class="selected-summary" id="selected-final-summary"></div>
+
+    <div style="display:grid;grid-template-columns:1.2fr 0.8fr;gap:20px" class="form-grid">
+      <div>
+        <h3 style="margin:0 0 12px"><i class="fa-solid fa-upload" style="margin-right:8px"></i>Preuve de paiement *</h3>
+        <p class="payment-tip">Envoyez 1$ via TransCash et uploadez la capture d'écran.</p>
+        <label><span>Capture preuve *</span><input type="file" id="payment-proof-file" accept="image/*" required /></label>
+        <div id="payment-preview" class="image-preview hidden" style="margin-top:12px"></div>
+        <div style="margin-top:20px">
+          <button class="btn-primary full" id="submit-ad-btn" disabled><i class="fa-solid fa-lock" style="margin-right:8px"></i>Payer 1$ et publier</button>
+          <p style="color:var(--muted);font-size:0.8rem;text-align:center;margin-top:10px">Après paiement, l'admin valide en moins de 30min.</p>
+        </div>
+      </div>
+      <div>
+        <div class="preview-box">
+          <h4><i class="fa-solid fa-clipboard-list"></i> Récapitulatif</h4>
+          <div id="final-preview" style="font-size:0.9rem;line-height:1.6"></div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px">
+      <button class="btn-secondary" id="back-to-3"><i class="fa-solid fa-arrow-left" style="margin-right:6px"></i>Modifier annonce</button>
+    </div>
+  </div>
+
+  <div id="success-card" class="post-card hidden" style="text-align:center">
+    <h1 style="color:var(--success)"><i class="fa-solid fa-circle-check" style="margin-right:10px"></i>Annonce soumise !</h1>
+    <p class="subtitle">Votre paiement est en cours de vérification.</p>
+    <div style="margin-top:24px">
+      <a href="/" class="btn-primary"><i class="fa-solid fa-house" style="margin-right:6px"></i>Retour à l'accueil</a>
+      <a href="/post.html" class="btn-secondary" style="margin-left:8px"><i class="fa-solid fa-plus" style="margin-right:6px"></i>Poster une autre</a>
+    </div>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <span style="font-weight:800"><i class="fa-solid fa-fire" style="color:var(--accent);margin-right:6px"></i>EscortHub</span>
+    <span>© Since 2013 - EscortHub Worldwide - All rights reserved</span>
+  </div>
+</footer>
+
+<script type="module" src="post.js"></script>
+</body>
+</html>
