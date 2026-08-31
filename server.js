@@ -1,7 +1,10 @@
 "use strict";
 require("dotenv").config();
-// Fix WebSocket for Node 20
-try { global.WebSocket = require("ws"); } catch {}
+try { 
+  if (typeof global.WebSocket === 'undefined') {
+    global.WebSocket = require("ws"); 
+  }
+} catch {}
 const express = require("express");
 const cors = require("cors");
 const path = require("path");
@@ -12,16 +15,22 @@ const PORT = process.env.PORT || 3000;
 const STATIC_DIR = __dirname;
 
 const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY;
+const SUPABASE_SECRET_KEY = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
 
 if (!SUPABASE_URL || !SUPABASE_SECRET_KEY) {
-  console.error("❌ Erreur : SUPABASE_URL et SUPABASE_SECRET_KEY requis dans .env");
-  process.exit(1);
+  console.error("❌ Erreur : SUPABASE_URL et SUPABASE_SECRET_KEY manquants - le serveur va répondre 500 sur /api mais pas crasher");
 }
 
-const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
-  auth: { autoRefreshToken: false, persistSession: false }
-});
+let supabaseAdmin = null;
+try {
+  if (SUPABASE_URL && SUPABASE_SECRET_KEY) {
+    supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SECRET_KEY, {
+      auth: { autoRefreshToken: false, persistSession: false }
+    });
+  }
+} catch (e) {
+  console.error("❌ Erreur création Supabase client:", e.message);
+}
 
 const app = express();
 
@@ -43,6 +52,10 @@ app.use((req, _, next) => {
 
 // ===== AUTH HELPERS =====
 async function requireUser(req, res) {
+  if (!supabaseAdmin) {
+    res.status(500).json({ error: "Supabase non configuré sur Vercel - vérifie SUPABASE_URL et SUPABASE_SECRET_KEY dans Variables d'environnement puis Redeploy" });
+    return null;
+  }
   const auth = req.headers.authorization || "";
   if (!auth.startsWith("Bearer ")) {
     res.status(401).json({ error: "Authentification requise." });
@@ -73,9 +86,33 @@ async function requireAdmin(req, res) {
 
 // ===== ROUTES API =====
 
-// Health
+// Health - ne nécessite pas Supabase
 app.get("/api/health", (req, res) => {
-  res.json({ ok: true, message: "Backend Supabase OK", timestamp: new Date().toISOString() });
+  res.json({ 
+    ok: true, 
+    message: "Backend Supabase OK", 
+    timestamp: new Date().toISOString(),
+    supabaseConfigured: !!supabaseAdmin,
+    env: {
+      hasUrl: !!SUPABASE_URL,
+      hasSecret: !!SUPABASE_SECRET_KEY,
+      url: SUPABASE_URL ? SUPABASE_URL.substring(0,30)+'...' : 'MISSING'
+    }
+  });
+});
+
+// Middleware pour vérifier Supabase sur toutes les autres routes /api
+app.use("/api", (req, res, next) => {
+  if (req.path === "/health") return next();
+  if (!supabaseAdmin) {
+    return res.status(500).json({ 
+      error: "Supabase non configuré",
+      details: "Vérifie sur Vercel > Settings > Environment Variables: SUPABASE_URL et SUPABASE_SECRET_KEY doivent être définis, puis fais Redeploy",
+      hasUrl: !!SUPABASE_URL,
+      hasSecret: !!SUPABASE_SECRET_KEY
+    });
+  }
+  next();
 });
 
 // --- PRODUCTS ---
@@ -272,13 +309,19 @@ app.get("*", (req, res) => {
   res.status(404).send("404 - Fichier introuvable");
 });
 
-// ===== START =====
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`✅ EscortHub v2 démarré sur http://localhost:${PORT}`);
-  console.log(`✅ Supabase connecté: ${SUPABASE_URL}`);
-  console.log(`✅ API santé: http://localhost:${PORT}/api/health`);
+// Error handler global - évite FUNCTION_INVOCATION_FAILED
+app.use((err, req, res, next) => {
+  console.error("❌ Erreur non gérée:", err);
+  res.status(500).json({ error: "Erreur interne", details: err.message });
 });
+
+// ===== START =====
 if (require.main === module) {
-  app.listen(PORT, "0.0.0.0", () => {...})
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`✅ EscortHub v2 démarré sur http://localhost:${PORT}`);
+    console.log(`✅ Supabase connecté: ${SUPABASE_URL}`);
+    console.log(`✅ API santé: http://localhost:${PORT}/api/health`);
+  });
 }
-module.exports = app; // <- indispensable pour Vercel
+
+module.exports = app;
