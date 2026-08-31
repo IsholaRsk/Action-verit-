@@ -1,0 +1,14 @@
+.env
+.env.local
+node_modules/
+.npm/
+.DS_Store
+*.log
+uploads/
+payment-proofs/
+product-images/
+.arena/
+.cache/
+dist/
+build/
+.vercel/

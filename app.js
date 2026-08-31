@@ -42,17 +42,24 @@ function hidePageLoader(){
   if(loader){ loader.classList.add("hidden"); setTimeout(()=>loader.remove(),600); }
 }
 
-// ===== API =====
+// ===== API - RADICAL VERCEL FIX: plus de /api, 100% Supabase direct =====
 async function apiRequest(path, options={}){
-  const { data: { session } } = await supabase.auth.getSession();
-  const headers = { "Content-Type":"application/json", ...(options.headers||{}) };
-  if(session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-  const res = await fetch(`/api${path}`, { ...options, headers, credentials:"same-origin" });
-  const text = await res.text();
-  let payload={};
-  try { payload = text?JSON.parse(text):{}; } catch { payload={message:text}; }
-  if(!res.ok) throw new Error(payload.error||payload.message||"Erreur API");
-  return payload;
+  // Fallback pour compatibilité locale: si server.js tourne en local, on l'utilise
+  // Sur Vercel, ce code ne sera jamais appelé car on utilise Supabase direct
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const headers = { "Content-Type":"application/json", ...(options.headers||{}) };
+    if(session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+    const res = await fetch(`/api${path}`, { ...options, headers, credentials:"same-origin" });
+    const text = await res.text();
+    let payload={};
+    try { payload = text?JSON.parse(text):{}; } catch { payload={message:text}; }
+    if(!res.ok) throw new Error(payload.error||payload.message||"Erreur API");
+    return payload;
+  } catch(e) {
+    // Sur Vercel sans backend, on propage pour que les fonctions directes prennent le relais
+    throw e;
+  }
 }
 
 // ===== HYDRATION =====
@@ -80,10 +87,11 @@ async function hydrateState(){
     const redirect=(settings||[]).find(x=>x.key==="payment_redirect_url")?.value;
     if(redirect) state.settings.paymentRedirectUrl=redirect;
     const user=await refreshCurrentUser();
-    if(user?.role==="admin"){
-      try{ const r=await apiRequest("/payments"); state.payments=r.payments||[]; }catch(e){ console.warn("Paiements admin:",e.message); state.payments=[]; }
-    } else if(user){
-      const { data: payments } = await supabase.from("payments").select("*").eq("user_id",user.id).order("created_at",{ascending:false});
+    if(user){
+      // RADICAL FIX: 100% Supabase direct, plus de /api/payments
+      // RLS: admin voit tout via is_admin(), user voit ses paiements
+      const { data: payments, error: payErr } = await supabase.from("payments").select("*").order("created_at",{ascending:false});
+      if(payErr) console.warn("Paiements:", payErr.message);
       state.payments=payments||[];
     } else state.payments=[];
   } finally { state.loading=false; }
@@ -461,7 +469,7 @@ function renderAdminPage(){
                 <strong>${pay.target==="product"?`<i class="fa-solid fa-cart-shopping" style="margin-right:6px"></i>Achat produit`:`<i class="fa-solid fa-bullhorn" style="margin-right:6px"></i>Annonce`} • ${formatPrice(pay.amount)}</strong>
                 <p><i class="fa-solid fa-user" style="margin-right:4px"></i>${escapeHtml(pay.user_id?.slice(0,8)||"Anonyme")} | <i class="fa-solid fa-money-bill" style="margin-right:4px"></i>${escapeHtml(pay.method)} | <i class="fa-solid fa-circle-info" style="margin-right:4px"></i><b>${escapeHtml(pay.status)}</b></p>
                 <p><i class="fa-regular fa-clock" style="margin-right:4px"></i>${new Date(pay.created_at).toLocaleString("fr-FR")} | ID: ${escapeHtml(pay.id.slice(0,8))}</p>
-                ${pay.proof_url?`<a href="/api/payments/${escapeHtml(pay.id)}/proof" target="_blank" rel="noopener noreferrer"><img src="/api/payments/${escapeHtml(pay.id)}/proof" alt="Preuve" class="payment-proof" loading="lazy" /></a>`:""}
+                ${pay.proof_url?`<div style="margin-top:8px"><button class="mini-btn" data-action="view-proof" data-path="${escapeHtml(pay.proof_url)}"><i class="fa-solid fa-eye"></i> Voir preuve</button><div class="proof-preview" id="proof-${escapeHtml(pay.id)}" style="margin-top:8px"></div></div>`:""}
               </div>
               <div class="admin-item-actions">
                 <button class="mini-btn success" data-action="accept-payment" data-id="${escapeHtml(pay.id)}"><i class="fa-solid fa-check"></i> Accepter</button>
@@ -493,16 +501,31 @@ function renderDiscussionPage(){
 
 // ===== PRODUCTS API =====
 async function saveProducts(product){
-  const payload={ ...(product.id?{id:product.id}:{}), nom:product.nom, age:Number(product.age), lieu:product.lieu, prix:Number(product.prix), image:product.image };
-  const result=await apiRequest("/products",{method:"POST",body:JSON.stringify(payload)});
-  const saved=result.product;
+  const payload={ ...(product.id?{id:product.id}:{}), nom:product.nom, age:Number(product.age), lieu:product.lieu, prix:Number(product.prix), image:product.image, updated_at: new Date().toISOString() };
+  // RADICAL: Supabase direct (Vercel safe) au lieu de /api/products
+  let saved;
+  try {
+    const { data, error } = await supabase.from("products").upsert(payload).select().single();
+    if(error) throw error;
+    saved=data;
+  } catch(e) {
+    try {
+      const result=await apiRequest("/products",{method:"POST",body:JSON.stringify(payload)});
+      saved=result.product;
+    } catch(e2) { throw e; }
+  }
   const idx=state.products.findIndex(x=>String(x.id)===String(saved.id));
   if(idx>=0) state.products[idx]=saved; else state.products.unshift(saved);
   showToast("Produit enregistré", "success");
   return saved;
 }
 async function deleteProduct(id){
-  await apiRequest(`/products/${encodeURIComponent(id)}`,{method:"DELETE"});
+  try {
+    const { error } = await supabase.from("products").delete().eq("id", id);
+    if(error) throw error;
+  } catch(e) {
+    try { await apiRequest(`/products/${encodeURIComponent(id)}`,{method:"DELETE"}); } catch(e2) { throw e; }
+  }
   state.products=state.products.filter(x=>String(x.id)!==String(id));
   showToast("Produit supprimé", "success");
 }
@@ -596,7 +619,10 @@ async function handleAdSubmit(e){
       mediaUrl=supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl;
     }
     if(!title||(!text&&!mediaUrl)){ showToast("Titre + contenu requis", "error"); return; }
-    const adRes=await apiRequest("/ads",{method:"POST",body:JSON.stringify({title,text,mediaType,mediaUrl})});
+    // RADICAL: Supabase direct
+    const { data: adData, error: adError } = await supabase.from("ads").insert({ user_id: user.id, title, text, media_type: mediaType, media_url: mediaUrl, status: "pending" }).select().single();
+    if(adError) throw adError;
+    const adRes={ ad: adData };
     closeAdModal();
     openPaymentModal({ target:"ad", amount:CONFIG.FIXED_AD_PRICE, title:"Paiement annonce - 1$", adId:adRes.ad.id });
     showToast("Annonce créée, paiement requis", "info");
@@ -615,7 +641,11 @@ async function handlePaymentSubmit(e){
     const path=`${user.id}/${crypto.randomUUID()}.${(file.name.split(".").pop()||"jpg").toLowerCase()}`;
     const { error: upErr } = await supabase.storage.from("payment-proofs").upload(path,file,{upsert:false,contentType:file.type});
     if(upErr) throw upErr;
-    await apiRequest("/payments",{method:"POST",body:JSON.stringify({productId,adId,target,amount,method,status:"pending",validation:"pending",proofUrl:path})});
+    // RADICAL: Supabase direct
+    {
+      const { error: payErr } = await supabase.from("payments").insert({ user_id: user.id, product_id: productId, ad_id: adId, target, amount, method, status: "pending", validation: "pending", proof_url: path });
+      if(payErr) throw payErr;
+    }
     closePaymentModal();
     setPaymentNotice("Votre paiement est en cours de vérification. Vous serez notifié après validation admin.");
     showToast("Paiement enregistré, en attente validation", "success", 6000);
@@ -663,7 +693,11 @@ function attachAdminHandlers(){
     const value=$("#payment-success-link").value.trim();
     if(!value){ showToast("Lien requis", "error"); return; }
     try{
-      await apiRequest("/settings",{method:"PATCH",body:JSON.stringify({paymentRedirectUrl:value})});
+      // RADICAL: Supabase direct
+      {
+        const { error: setErr } = await supabase.from("settings").upsert({ key: "payment_redirect_url", value, updated_at: new Date().toISOString() });
+        if(setErr) throw setErr;
+      }
       setRedirectUrl(value);
       showToast("Lien enregistré", "success");
     } catch(err){ showToast(err.message, "error"); }
@@ -694,7 +728,14 @@ function attachAdminHandlers(){
   $$('[data-action="accept-payment"]').forEach(btn=>btn.addEventListener("click", async ()=>{
     try{
       btn.innerHTML=`<i class="fa-solid fa-spinner fa-spin"></i>`;
-      await apiRequest(`/payments/${btn.dataset.id}`,{method:"PATCH",body:JSON.stringify({status:"accepted",validation:"valid"})});
+      // RADICAL: Supabase direct
+      {
+        const { data: payment, error: payUpErr } = await supabase.from("payments").update({ status: "accepted", validation: "valid", updated_at: new Date().toISOString() }).eq("id", btn.dataset.id).select().single();
+        if(payUpErr) throw payUpErr;
+        if(payment.target==="ad" && payment.ad_id) {
+          await supabase.from("ads").update({ status: "active", updated_at: new Date().toISOString() }).eq("id", payment.ad_id);
+        }
+      }
       await hydrateState();
       clearPaymentNotice();
       showToast("Paiement accepté, redirection...", "success");
@@ -703,7 +744,13 @@ function attachAdminHandlers(){
   }));
   $$('[data-action="decline-payment"]').forEach(btn=>btn.addEventListener("click", async ()=>{
     try{
-      await apiRequest(`/payments/${btn.dataset.id}`,{method:"PATCH",body:JSON.stringify({status:"declined",validation:"invalid"})});
+      {
+        const { data: payment, error: payUpErr } = await supabase.from("payments").update({ status: "declined", validation: "invalid", updated_at: new Date().toISOString() }).eq("id", btn.dataset.id).select().single();
+        if(payUpErr) throw payUpErr;
+        if(payment.target==="ad" && payment.ad_id) {
+          await supabase.from("ads").update({ status: "declined", updated_at: new Date().toISOString() }).eq("id", payment.ad_id);
+        }
+      }
       await hydrateState();
       showToast("Paiement décliné", "info");
       render();
@@ -711,7 +758,28 @@ function attachAdminHandlers(){
   }));
   $$('[data-action="delete-ad"]').forEach(btn=>btn.addEventListener("click", async ()=>{
     if(!confirm("Supprimer cette annonce ?")) return;
-    try{ await apiRequest(`/ads/${btn.dataset.id}`,{method:"DELETE"}); await hydrateState(); showToast("Annonce supprimée", "success"); render(); }catch(e){ showToast(e.message, "error"); }
+    try{ const { error } = await supabase.from("ads").delete().eq("id", btn.dataset.id); if(error) throw error; await hydrateState(); showToast("Annonce supprimée", "success"); render(); }catch(e){ showToast(e.message, "error"); }
+  }));
+  $$('[data-action="view-proof"]').forEach(btn=>btn.addEventListener("click", async ()=>{
+    const path = btn.dataset.path;
+    const previewId = btn.nextElementSibling?.id;
+    const previewEl = previewId ? document.getElementById(previewId) : btn.nextElementSibling;
+    if(!path) return;
+    btn.innerHTML=`<i class="fa-solid fa-spinner fa-spin"></i> Chargement...`;
+    try {
+      const { data, error } = await supabase.storage.from("payment-proofs").createSignedUrl(path, 300);
+      if(error) throw error;
+      if(previewEl) {
+        previewEl.innerHTML=`<a href="${data.signedUrl}" target="_blank"><img src="${data.signedUrl}" alt="Preuve" class="payment-proof" style="width:100%;max-width:300px;border-radius:8px;margin-top:8px" /></a>`;
+      } else {
+        window.open(data.signedUrl, "_blank");
+      }
+      showToast("Preuve chargée", "success");
+    } catch(e) {
+      showToast("Erreur preuve: "+e.message, "error");
+    } finally {
+      btn.innerHTML=`<i class="fa-solid fa-eye"></i> Voir preuve`;
+    }
   }));
   $("#admin-logout-btn")?.addEventListener("click", logoutUser);
 }
@@ -732,7 +800,10 @@ function bindModalControls(){
         const path=`${user.id}/${crypto.randomUUID()}.${(file.name.split(".").pop()||"jpg").toLowerCase()}`;
         const { error } = await supabase.storage.from("payment-proofs").upload(path,file,{upsert:false,contentType:file.type});
         if(error) throw error;
-        await apiRequest("/payments",{method:"POST",body:JSON.stringify({adId:$("#payment-ad-id").value||null,target:"ad",amount:Number($("#payment-amount").value||0),method:"transcash",status:"pending",validation:"pending",proofUrl:path})});
+        {
+          const { error: payErr } = await supabase.from("payments").insert({ user_id: user.id, ad_id: $("#payment-ad-id").value||null, target: "ad", amount: Number($("#payment-amount").value||0), method: "transcash", status: "pending", validation: "pending", proof_url: path });
+          if(payErr) throw payErr;
+        }
         closePaymentModal();
         setPaymentNotice("Paiement annonce en vérification.");
         showToast("Paiement enregistré", "success");

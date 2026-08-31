@@ -28,15 +28,21 @@ function hidePageLoader(){
   if(loader){ loader.style.opacity="0"; setTimeout(()=>loader.remove(),500); }
 }
 async function apiRequest(path, options={}){
-  const { data: { session } } = await supabase.auth.getSession();
-  const headers = { "Content-Type":"application/json", ...(options.headers||{}) };
-  if(session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-  const res = await fetch(`/api${path}`, { ...options, headers });
-  const text = await res.text();
-  let payload={};
-  try { payload = text?JSON.parse(text):{}; } catch { payload={message:text}; }
-  if(!res.ok) throw new Error(payload.error||payload.message||"Erreur API");
-  return payload;
+  // VERCEL RADICAL FIX: essaie /api si dispo (local), sinon fallback Supabase direct
+  try {
+    const { data: { session } } = await supabase.auth.getSession();
+    const headers = { "Content-Type":"application/json", ...(options.headers||{}) };
+    if(session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+    const res = await fetch(`/api${path}`, { ...options, headers });
+    const text = await res.text();
+    let payload={};
+    try { payload = text?JSON.parse(text):{}; } catch { payload={message:text}; }
+    if(!res.ok) throw new Error(payload.error||payload.message||"Erreur API");
+    return payload;
+  } catch(e) {
+    // Sur Vercel statique sans backend, on laisse l'appelant gérer en Supabase direct
+    throw e;
+  }
 }
 function setStep(n){
   $$(".post-step").forEach(el=>{
@@ -700,44 +706,83 @@ function initPaymentStep(){
         mainImageUrl = `https://picsum.photos/seed/${Date.now()}/400/300`;
       }
       const fullTitle = `[${adData.location.city}] ${adData.title}`;
-      const adRes = await apiRequest("/ads", {
-        method: "POST",
-        body: JSON.stringify({
+      let adId;
+      try {
+        const { data: adRow, error: adErr } = await supabase.from("ads").insert({
+          user_id: user.id,
           title: fullTitle,
           text: `${adData.description}\n\nTél: ${adData.phone}\nVille: ${adData.location.city}, ${adData.location.country}\nCatégorie: ${adData.category.label}\nPrix: ${adData.price}$\nAge: ${adData.age} ans\nDispo: ${adData.availability}\nLangues: ${adData.languages}\nRègles: ${adData.rules}`,
-          mediaType: mainImageUrl ? "image" : "text",
-          mediaUrl: mainImageUrl
-        })
-      });
-      const adId = adRes.ad.id;
+          media_type: mainImageUrl ? "image" : "text",
+          media_url: mainImageUrl,
+          status: "pending"
+        }).select().single();
+        if(adErr) throw adErr;
+        adId = adRow.id;
+      } catch(e) {
+        const adRes = await apiRequest("/ads", {
+          method: "POST",
+          body: JSON.stringify({
+            title: fullTitle,
+            text: `${adData.description}\n\nTél: ${adData.phone}\nVille: ${adData.location.city}, ${adData.location.country}\nCatégorie: ${adData.category.label}\nPrix: ${adData.price}$\nAge: ${adData.age} ans\nDispo: ${adData.availability}\nLangues: ${adData.languages}\nRègles: ${adData.rules}`,
+            mediaType: mainImageUrl ? "image" : "text",
+            mediaUrl: mainImageUrl
+          })
+        });
+        adId = adRes.ad.id;
+      }
       const proofPath = `${user.id}/${crypto.randomUUID()}.${(file.name.split(".").pop()||"jpg").toLowerCase()}`;
       const { error: upErr } = await supabase.storage.from("payment-proofs").upload(proofPath, file, { upsert:false, contentType:file.type });
       if(upErr) throw upErr;
-      await apiRequest("/payments", {
-        method: "POST",
-        body: JSON.stringify({
-          adId,
+      try {
+        const { error: payErr } = await supabase.from("payments").insert({
+          user_id: user.id,
+          ad_id: adId,
           target: "ad",
           amount: CONFIG.FIXED_AD_PRICE,
           method: "transcash",
           status: "pending",
           validation: "pending",
-          proofUrl: proofPath
-        })
-      });
-      try {
-        await apiRequest("/products", {
+          proof_url: proofPath
+        });
+        if(payErr) throw payErr;
+      } catch(e) {
+        await apiRequest("/payments", {
           method: "POST",
           body: JSON.stringify({
-            nom: adData.title,
-            age: adData.age,
-            lieu: `${adData.location.city}, ${adData.location.country}`,
-            prix: adData.price,
-            image: mainImageUrl
+            adId,
+            target: "ad",
+            amount: CONFIG.FIXED_AD_PRICE,
+            method: "transcash",
+            status: "pending",
+            validation: "pending",
+            proofUrl: proofPath
           })
         });
+      }
+      try {
+        const { error: prodErr } = await supabase.from("products").insert({
+          nom: adData.title,
+          age: adData.age,
+          lieu: `${adData.location.city}, ${adData.location.country}`,
+          prix: adData.price,
+          image: mainImageUrl
+        });
+        if(prodErr) throw prodErr;
       } catch (e) {
-        console.warn("Product creation failed:", e.message);
+        try {
+          await apiRequest("/products", {
+            method: "POST",
+            body: JSON.stringify({
+              nom: adData.title,
+              age: adData.age,
+              lieu: `${adData.location.city}, ${adData.location.country}`,
+              prix: adData.price,
+              image: mainImageUrl
+            })
+          });
+        } catch (e2) {
+          console.warn("Product creation failed:", e.message);
+        }
       }
       localStorage.removeItem("post-selected-location");
       localStorage.removeItem("post-selected-category");

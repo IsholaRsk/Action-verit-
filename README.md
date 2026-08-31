@@ -35,11 +35,11 @@ npm start
 ## 🔑 Variables .env
 
 ```
-SUPABASE_URL=https://eecjjupfdujvludxtloj.supabase.co
+SUPABASE_URL=https://desgfxqfmuqkslzntefg.supabase.co
 SUPABASE_SECRET_KEY=sb_secret_xxx (service_role, JAMAIS exposée frontend)
 SUPABASE_PUBLISHABLE_KEY=sb_publishable_xxx (publishable)
 PORT=3000
-DEFAULT_REDIRECT_URL=https://t.me/@IsholaRsk
+DEFAULT_REDIRECT_URL=https://t.me/Polarish87
 FIXED_AD_PRICE=5000
 ```
 

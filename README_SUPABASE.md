@@ -114,7 +114,7 @@ Si tu veux le faire en SQL :
 -- Auto confirm: true
 
 -- 2. Récupère son ID
-select id, email from auth.users where email='john@email.com';
+select id, email from auth.users where email='ijlalradji3@email.com';
 
 -- 3. Passe en admin
 update public.profiles set role='admin' where id='UUID_ICI';
