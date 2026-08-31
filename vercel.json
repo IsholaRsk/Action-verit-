@@ -1,12 +1,19 @@
 {
-  "version": 2,
+  "cleanUrls": true,
   "rewrites": [
-    { "source": "/api/:path*", "destination": "/api" },
+    { "source": "/post.html", "destination": "/post.html" },
     { "source": "/config.js", "destination": "/config.js" },
     { "source": "/app.js", "destination": "/app.js" },
     { "source": "/post.js", "destination": "/post.js" },
     { "source": "/style.css", "destination": "/style.css" },
-    { "source": "/post.html", "destination": "/post.html" },
-    { "source": "/(.*)", "destination": "/api" }
+    { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-cache" }
+      ]
+    }
   ]
 }
