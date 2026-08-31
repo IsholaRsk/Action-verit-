@@ -278,3 +278,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ Supabase connecté: ${SUPABASE_URL}`);
   console.log(`✅ API santé: http://localhost:${PORT}/api/health`);
 });
+if (require.main === module) {
+  app.listen(PORT, "0.0.0.0", () => {...})
+}
+module.exports = app; // <- indispensable pour Vercel
