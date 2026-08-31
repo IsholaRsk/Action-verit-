@@ -6,6 +6,8 @@
     { "source": "/app.js", "destination": "/app.js" },
     { "source": "/post.js", "destination": "/post.js" },
     { "source": "/style.css", "destination": "/style.css" },
+    { "source": "/favicon.png", "destination": "/favicon.png" },
+    { "source": "/favicon.svg", "destination": "/favicon.svg" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
