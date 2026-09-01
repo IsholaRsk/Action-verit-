@@ -4,157 +4,30 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>EscortHub - Catalogue Premium Worldwide</title>
-  <meta name="description" content="EscortHub - Découvre des offres rapides, sécurisées et visibles. Monde entier." />
-  <!-- Favicon flamme comme GitHub -->
   <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  <link rel="icon" type="image/png" href="/favicon.png" />
-  <link rel="shortcut icon" type="image/png" href="/favicon.png" />
-  <link rel="apple-touch-icon" href="/favicon.png" />
   <link rel="stylesheet" href="style.css" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;900&display=swap" rel="stylesheet">
-  <!-- Font Awesome Pro - Icônes professionnelles -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" />
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/fontawesome.min.css" />
-  <!-- Supabase JS v2 ESM -->
-  <script type="importmap">
-  {
-    "imports": {
-      "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0/+esm"
+  <script src="https://cdn.paddle.com/paddle/v2/paddle.js"></script>
+  <script>
+    window.PADDLE_CLIENT_TOKEN = "live_5695fc05de115dd28afbe00eb1f";
+    window.PADDLE_ENV = "production";
+    window.PADDLE_PRICE_ID = "pri_01m1e8e2ybr9rjmaq0kz4ezpnk";
+    function initPaddleLive(){
+      try{ if(window.Paddle){ Paddle.Environment.set("production"); Paddle.Initialize({ token: "live_5695fc05de115dd28afbe00eb1f" }); console.log("Paddle live initialized"); } }catch(e){ console.error(e); }
     }
-  }
+    if(window.Paddle) initPaddleLive(); else window.addEventListener('load', initPaddleLive);
   </script>
+  <script type="importmap">{ "imports": { "@supabase/supabase-js": "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.57.0/+esm" } }</script>
 </head>
 <body>
-<div id="page-loader" class="page-loader">
-  <div class="loader-content">
-    <div class="loader-logo">Escort<span>Hub</span></div>
-    <div class="loader-spinner"><i class="fa-solid fa-spinner fa-spin"></i></div>
-    <p>Chargement de l'expérience premium...</p>
-  </div>
-</div>
-
-<header class="site-header">
-  <div class="header-inner">
-    <a href="#/" class="brand"><i class="fa-solid fa-fire" style="color:var(--accent);margin-right:8px"></i>Escort<span>Hub</span></a>
-    <nav class="main-nav">
-      <a href="#/" data-nav="home"><i class="fa-solid fa-house"></i> Accueil</a>
-      <a href="#/products" data-nav="products"><i class="fa-solid fa-grid"></i> Catalogue</a>
-      <a href="/post.html" data-nav="post"><i class="fa-solid fa-plus"></i> Poster</a>
-    </nav>
-    <div class="header-actions">
-      <a href="/post.html" id="post-ad-btn" class="post-btn"><i class="fa-solid fa-bolt"></i> Poster une annonce</a>
-      <a href="#/login" id="login-link" class="nav-link"><i class="fa-solid fa-right-to-bracket"></i> Connexion</a>
-      <a href="#/signup" id="signup-link" class="nav-link"><i class="fa-solid fa-user-plus"></i> Inscription</a>
-      <button id="logout-btn" class="logout-btn hidden"><i class="fa-solid fa-right-from-bracket"></i> Déconnexion</button>
-      <button id="search-toggle" class="icon-btn"><i class="fa-solid fa-magnifying-glass"></i></button>
-    </div>
-  </div>
-  <div id="search-bar" class="search-bar hidden">
-    <div class="search-bar-inner">
-      <i class="fa-solid fa-magnifying-glass"></i>
-      <input type="text" id="global-search" placeholder="Rechercher un profil, ville, prix..." />
-      <button id="close-search"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-  </div>
-</header>
-
+<div id="page-loader" class="page-loader"><div class="loader-content"><div class="loader-logo">Escort<span>Hub</span></div><div class="loader-spinner"><i class="fa-solid fa-spinner fa-spin"></i></div><p>Chargement premium...</p></div></div>
+<header class="site-header"><div class="header-inner"><a href="#/" class="brand">EscortHub</a><nav class="main-nav"><a href="#/">Accueil</a><a href="#/products">Catalogue</a><a href="#/orders">Mes commandes</a></nav><div class="header-actions"><a href="#/login" id="login-link" class="nav-link">Connexion</a><a href="#/signup" id="signup-link" class="nav-link">Inscription</a><button id="logout-btn" class="logout-btn hidden">Déconnexion</button></div></div></header>
 <div id="site-banner" class="site-banner"></div>
 <div id="site-notice" class="site-notice hidden"></div>
-
 <div id="toast-container" class="toast-container"></div>
-
-<main id="app">
-  <div class="skeleton-wrapper">
-    <div class="skeleton hero-skeleton"></div>
-    <div class="skeleton-grid">
-      <div class="skeleton card-skeleton"></div>
-      <div class="skeleton card-skeleton"></div>
-      <div class="skeleton card-skeleton"></div>
-      <div class="skeleton card-skeleton"></div>
-    </div>
-  </div>
-</main>
-
-<footer class="site-footer">
-  <div class="footer-inner">
-    <div style="display:flex;align-items:center;gap:8px">
-      <i class="fa-solid fa-fire" style="color:var(--accent)"></i>
-      <span style="font-weight:800;letter-spacing:0.06em">EscortHub</span>
-      <span style="opacity:.5;margin-left:12px"><i class="fa-solid fa-shield-halved" style="margin-right:4px"></i>Sécurisé</span>
-      <span style="opacity:.5;margin-left:8px"><i class="fa-solid fa-bolt" style="margin-right:4px"></i>Rapide</span>
-      <span style="opacity:.5;margin-left:8px"><i class="fa-solid fa-earth-americas" style="margin-right:4px"></i>Monde</span>
-    </div>
-    <span><i class="fa-regular fa-copyright" style="margin-right:4px"></i> Since 2013 - Tous droits réservés</span>
-  </div>
-</footer>
-
-<!-- MODAL ANNONCE -->
-<div id="ad-modal" class="modal hidden" role="dialog" aria-modal="true">
-  <div class="modal-card">
-    <div class="modal-head">
-      <h3><i class="fa-solid fa-bullhorn" style="margin-right:8px;color:var(--accent)"></i>Poster une annonce</h3>
-      <button id="close-ad-modal" class="close-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <form id="ad-form">
-      <label><span><i class="fa-solid fa-heading" style="margin-right:4px"></i>Titre *</span><input type="text" name="adTitle" placeholder="Ex: Promo exclusive" required /></label>
-      <label><span><i class="fa-solid fa-align-left" style="margin-right:4px"></i>Texte</span><textarea name="adText" rows="3" placeholder="Votre message"></textarea></label>
-      <label><span><i class="fa-solid fa-photo-film" style="margin-right:4px"></i>Type de média</span>
-        <select name="mediaType">
-          <option value="text">Texte uniquement</option>
-          <option value="image">Image</option>
-          <option value="video">Vidéo</option>
-        </select>
-      </label>
-      <label><span><i class="fa-solid fa-upload" style="margin-right:4px"></i>Téléverser</span><input type="file" name="mediaUpload" accept="image/*,video/*" /></label>
-      <label><span><i class="fa-solid fa-link" style="margin-right:4px"></i>Ou URL</span><input type="url" name="mediaUrl" placeholder="https://..." /></label>
-      <button type="submit" class="btn-primary full"><i class="fa-solid fa-credit-card" style="margin-right:8px"></i>Payer 1$ et publier</button>
-      <p class="payment-tip" style="margin-top:8px"><i class="fa-solid fa-circle-info" style="margin-right:4px"></i>Visible après validation admin.</p>
-    </form>
-  </div>
-</div>
-
-<!-- MODAL PAIEMENT -->
-<div id="payment-modal" class="modal hidden" role="dialog" aria-modal="true">
-  <div class="modal-card">
-    <div class="modal-head">
-      <h3 id="payment-title"><i class="fa-solid fa-lock" style="margin-right:8px"></i>Paiement</h3>
-      <button id="close-payment-modal" class="close-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
-    </div>
-    <form id="payment-form">
-      <input type="hidden" id="payment-target" name="target" />
-      <input type="hidden" id="payment-product-id" name="productId" />
-      <input type="hidden" id="payment-ad-id" name="adId" />
-      <input type="hidden" id="payment-amount" name="amount" />
-
-      <div class="payment-methods">
-        <label class="method-option">
-          <input type="radio" name="method" value="transcash" checked />
-          <i class="fa-solid fa-money-bill-transfer" style="margin-right:8px;color:var(--accent)"></i><span>Recharge TransCash</span>
-        </label>
-        <label class="method-option" style="opacity:.5">
-          <input type="radio" name="method" value="card" disabled />
-          <i class="fa-solid fa-credit-card" style="margin-right:8px"></i><span>Carte (bientôt)</span>
-        </label>
-      </div>
-
-      <p class="payment-tip"><i class="fa-solid fa-triangle-exclamation" style="margin-right:6px"></i>Montant différent = paiement non validé.</p>
-
-      <div id="transcash-fields" class="method-fields">
-        <input type="hidden" id="transcash-amount" value="0" />
-        <label><span><i class="fa-solid fa-receipt" style="margin-right:4px"></i>Preuve de recharge *</span><input type="file" id="transcash-proof" accept="image/*" required /></label>
-        <div id="transcash-preview" class="image-preview hidden"></div>
-      </div>
-
-      <div id="card-fields" class="method-fields hidden">
-        <p class="payment-tip">Paiement par carte bientôt disponible via prestataire sécurisé.</p>
-      </div>
-
-      <button type="submit" class="btn-primary full"><i class="fa-solid fa-check" style="margin-right:8px"></i>Valider le paiement</button>
-    </form>
-  </div>
-</div>
-
+<main id="app"></main>
+<footer class="site-footer"><div class="footer-inner" style="display:flex;flex-direction:column;gap:8px;text-align:center;padding:16px"><div>EscortHub © Since 2013 <span style="margin-left:8px;background:var(--success);color:#fff;padding:2px 8px;border-radius:10px;font-size:0.7rem">Paddle 5,99€</span></div><div style="font-size:0.85rem;color:var(--muted)">Veuillez nous signaler si vous constatez de fausses informations</div></div></footer>
 <script type="module" src="app.js"></script>
 </body>
 </html>

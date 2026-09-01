@@ -1,9 +1,13 @@
-// Config frontend - ES Module - Hero glamour sexy aléatoire toutes les heures
+// Config frontend - ES Module - Hero + Paddle Billing
 export const CONFIG = {
   SUPABASE_URL: "https://desgfxqfmuqkslzntefg.supabase.co",
   SUPABASE_PUBLISHABLE_KEY: "sb_publishable_vpkoBXpNMei3METFgHwgqg_ExHJEOw6",
   FIXED_AD_PRICE: 1,
   PAYMENT_REDIRECT_KEY: "escorhub-payment-success-link",
+  // PADDLE BILLING - Abonnement 5.99€ pri_01m1e8e2ybr9rjmaq0kz4ezpnk
+  PADDLE_CLIENT_TOKEN: typeof window !== 'undefined' ? (window.PADDLE_CLIENT_TOKEN || "live_5695fc05de115dd28afbe00eb1f") : "live_5695fc05de115dd28afbe00eb1f",
+  PADDLE_ENV: typeof window !== 'undefined' ? (window.PADDLE_ENV || "production") : "production",
+  PADDLE_PRICE_ID: "pri_01m1e8e2ybr9rjmaq0kz4ezpnk",
   // 12 fonds hero femme sexy glamour - changent aléatoirement toutes les heures
   HERO_IMAGES: [
     "https://images.unsplash.com/photo-1529626455594-4ff0802cfb7e?q=80&w=1920&auto=format&fit=crop",

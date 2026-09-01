@@ -380,6 +380,11 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); backgro
   .banner-item { grid-template-columns: 120px 1fr; }
   .banner-item img, .banner-item video { width: 120px; height: 80px; }
 }
+  display: none !important;
+}
+
+@media (max-width: 900px) {
+}
 @media (max-width: 640px) {
   .header-inner { padding: 14px 16px; }
   .section, .page-shell, .admin-page, .auth-page, .hero { padding-left: 16px; padding-right: 16px; }

@@ -1,990 +1,182 @@
-import { createClient } from "@supabase/supabase-js";
-import { CONFIG } from "./config.js";
-
-const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_PUBLISHABLE_KEY);
-
-const state = {
-  products: [],
-  payments: [],
-  ads: [],
-  settings: { paymentRedirectUrl: CONFIG.DEFAULT_REDIRECT },
-  currentUser: null,
-  loading: true,
-  searchQuery: ""
-};
-
-const $ = (s, root=document) => root.querySelector(s);
-const $$ = (s, root=document) => [...root.querySelectorAll(s)];
-
-function escapeHtml(v){ return String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;"); }
-function formatPrice(v){ return `$${Number(v||0).toLocaleString("en-US")}`; }
-function readFileAsDataUrl(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file); }); }
-function getRedirectUrl(){ try{ const raw=localStorage.getItem(CONFIG.PAYMENT_REDIRECT_KEY); if(raw?.trim()) return raw; }catch{} return state.settings.paymentRedirectUrl||CONFIG.DEFAULT_REDIRECT; }
-function setRedirectUrl(url){ localStorage.setItem(CONFIG.PAYMENT_REDIRECT_KEY, url); state.settings.paymentRedirectUrl=url; }
-function getCurrentUser(){ try{ return JSON.parse(localStorage.getItem("escorhub-current-user")||"null"); }catch{ return null; } }
-function setCurrentUser(u){ if(u) localStorage.setItem("escorhub-current-user", JSON.stringify(u)); else localStorage.removeItem("escorhub-current-user"); state.currentUser=u; }
-
-// ===== DYNAMIQUE : TOAST SYSTEM =====
-function showToast(message, type="info", duration=4000){
-  const container = $("#toast-container");
-  if(!container) return;
-  const icons = { success:"fa-circle-check", error:"fa-circle-xmark", info:"fa-circle-info" };
-  const toast = document.createElement("div");
-  toast.className = `toast ${type}`;
-  toast.innerHTML = `<i class="fa-solid ${icons[type]||icons.info}"></i><span>${escapeHtml(message)}</span><button style="margin-left:auto;background:transparent;border:none;color:var(--muted);cursor:pointer" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>`;
-  container.appendChild(toast);
-  setTimeout(()=>{ toast.style.opacity="0"; toast.style.transform="translateX(20px)"; setTimeout(()=>toast.remove(),300); }, duration);
-}
-
-// ===== DYNAMIQUE : PAGE LOADER =====
-function hidePageLoader(){
-  const loader = $("#page-loader");
-  if(loader){ loader.classList.add("hidden"); setTimeout(()=>loader.remove(),600); }
-}
-
-// ===== API - RADICAL VERCEL FIX: plus de /api, 100% Supabase direct =====
-async function apiRequest(path, options={}){
-  // Fallback pour compatibilité locale: si server.js tourne en local, on l'utilise
-  // Sur Vercel, ce code ne sera jamais appelé car on utilise Supabase direct
-  try {
-    const { data: { session } } = await supabase.auth.getSession();
-    const headers = { "Content-Type":"application/json", ...(options.headers||{}) };
-    if(session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
-    const res = await fetch(`/api${path}`, { ...options, headers, credentials:"same-origin" });
-    const text = await res.text();
-    let payload={};
-    try { payload = text?JSON.parse(text):{}; } catch { payload={message:text}; }
-    if(!res.ok) throw new Error(payload.error||payload.message||"Erreur API");
-    return payload;
-  } catch(e) {
-    // Sur Vercel sans backend, on propage pour que les fonctions directes prennent le relais
-    throw e;
-  }
-}
-
-// ===== HYDRATION =====
-async function refreshCurrentUser(){
-  const { data: { user }, error } = await supabase.auth.getUser();
-  if(error||!user){ setCurrentUser(null); return null; }
-  const { data: profile } = await supabase.from("profiles").select("id,full_name,username,role").eq("id", user.id).maybeSingle();
-  const current = { id:user.id, email:user.email||"", username:profile?.username||user.user_metadata?.username||"", fullName:profile?.full_name||user.user_metadata?.full_name||"", role:profile?.role||"user" };
-  setCurrentUser(current);
-  return current;
-}
-async function hydrateState(){
-  state.loading=true;
+import { createClient } from "@supabase/supabase-js"; import { CONFIG } from "./config.js";
+const supabase=createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_PUBLISHABLE_KEY);
+const state={products:[],paymentMethods:[],depositRequests:[],transactions:[],notifications:[],currentUser:null,pendingMethod:null,subscription:null,isPremium:false};
+const $=s=>document.querySelector(s);
+const esc=v=>String(v??"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const euro=v=>`${Number(v||0).toFixed(2)} €`;
+const getUser=()=>{try{return JSON.parse(localStorage.getItem("escorhub-current-user")||"null")}catch{return null}};
+const setUser=u=>{if(u)localStorage.setItem("escorhub-current-user",JSON.stringify(u));else localStorage.removeItem("escorhub-current-user")};
+const getPending=()=>{try{return JSON.parse(localStorage.getItem("pending-product")||"null")}catch{return null}};
+const setPending=o=>{if(o)localStorage.setItem("pending-product",JSON.stringify(o));else localStorage.removeItem("pending-product")};
+const getPM=()=>localStorage.getItem("pending-payment-method")||null;
+const setPM=id=>{if(id)localStorage.setItem("pending-payment-method",id);else localStorage.removeItem("pending-payment-method")};
+const tgUrl=p=>{if(p?.telegram_link)return p.telegram_link.startsWith('http')?p.telegram_link:`https://t.me/${p.telegram_link.replace('@','')}`; if(p?.telegram_username)return `https://t.me/${p.telegram_username.replace('@','')}`; return CONFIG.DEFAULT_REDIRECT||'https://t.me/Polarish87'};
+const PRICE_ID="pri_01m1e8e2ybr9rjmaq0kz4ezpnk";
+function toast(m,t="info"){const c=$("#toast-container");if(!c)return;const d=document.createElement("div");d.className=`toast ${t}`;d.innerHTML=`<span>${esc(m)}</span>`;c.appendChild(d);setTimeout(()=>d.remove(),4000)}
+async function refreshUser(){const {data:{user}}=await supabase.auth.getUser();if(!user){setUser(null);return null}let p=null;try{const {data}=await supabase.from("profiles").select("id,role,balance,email,username,is_premium,premium_until").eq("id",user.id).maybeSingle();p=data}catch{}const cur={id:user.id,email:user.email,role:p?.role||"user",balance:Number(p?.balance||0),username:p?.username||"",is_premium:!!p?.is_premium};setUser(cur);return cur}
+async function checkPremium(){
   try{
-    const [{ data: products, error: pe }, { data: ads, error: ae }, { data: settings, error: se }] = await Promise.all([
-      supabase.from("products").select("*").order("created_at",{ascending:false}),
-      supabase.from("ads").select("*").eq("status","active").order("created_at",{ascending:false}),
-      supabase.from("settings").select("*")
-    ]);
-    if(pe) console.error("Produits:",pe);
-    if(ae) console.warn("Ads:",ae);
-    if(se) console.warn("Settings:",se);
-    state.products=products||[];
-    state.ads=ads||[];
-    const redirect=(settings||[]).find(x=>x.key==="payment_redirect_url")?.value;
-    if(redirect) state.settings.paymentRedirectUrl=redirect;
-    const user=await refreshCurrentUser();
-    if(user){
-      // RADICAL FIX: 100% Supabase direct, plus de /api/payments
-      // RLS: admin voit tout via is_admin(), user voit ses paiements
-      const { data: payments, error: payErr } = await supabase.from("payments").select("*").order("created_at",{ascending:false});
-      if(payErr) console.warn("Paiements:", payErr.message);
-      state.payments=payments||[];
-    } else state.payments=[];
-  } finally { state.loading=false; }
+    const {data:{session}}=await supabase.auth.getSession(); if(!session?.access_token) return {isActive:false};
+    const res=await fetch('/api/subscription/status',{headers:{Authorization:`Bearer ${session.access_token}`}}); const data=await res.json();
+    state.subscription=data.subscription||null; state.isPremium=!!data.isActive;
+    // sync local user badge
+    const u=getUser(); if(u){u.is_premium=state.isPremium; setUser(u);}
+    return data;
+  }catch(e){console.error(e); return {isActive:false}}
+}
+async function hydrate(){try{const {data:products}=await supabase.from("products").select("*").order("created_at",{ascending:false});state.products=products||[];const u=await refreshUser();if(u){const [dep,tx,pm,sub]=await Promise.all([supabase.from("deposit_requests").select("*").order("created_at",{ascending:false}),supabase.from("transactions").select("*").order("created_at",{ascending:false}),supabase.from("payment_methods").select("*").eq("enabled",true),checkPremium()]);state.depositRequests=dep.data||[];state.transactions=tx.data||[];state.paymentMethods=pm.data||[];}}catch(e){console.error(e)}}
+
+function subscriptionRequiredScreen(){
+  return `<section class="page-shell centered" style="text-align:center;padding:60px 20px;max-width:600px;margin:0 auto">
+    <div style="background:var(--panel);border:2px solid var(--accent);border-radius:20px;padding:32px">
+      <div style="font-size:3rem;margin-bottom:16px">🔒</div>
+      <h1 style="margin:0 0 12px">Abonnement requis</h1>
+      <p style="color:var(--muted);font-size:1.1rem;margin:0 0 20px">Abonnez-vous pour accéder à toutes les fonctionnalités du site.<br>L'abonnement coûte <strong>5,99 € par mois</strong> et donne accès premium pendant toute la durée.</p>
+      <div style="background:var(--panel-soft);border-radius:12px;padding:16px;margin-bottom:20px;text-align:left">
+        <p style="margin:0 0 8px"><i class="fa-solid fa-check" style="color:var(--success)"></i> Accès complet catalogue premium</p>
+        <p style="margin:0 0 8px"><i class="fa-solid fa-check" style="color:var(--success)"></i> Paiement sécurisé par solde</p>
+        <p style="margin:0 0 8px"><i class="fa-solid fa-check" style="color:var(--success)"></i> Commandes + Telegram associé</p>
+        <p style="margin:0"><i class="fa-solid fa-check" style="color:var(--success)"></i> Support premium</p>
+      </div>
+      <button class="btn-primary full" id="subscribe-now-btn" style="padding:16px;font-size:1.1rem"><i class="fa-solid fa-crown"></i> S'abonner maintenant - 5,99€/mois</button>
+      <p style="font-size:0.8rem;color:var(--muted);margin-top:12px">Paiement sécurisé via Paddle Billing - Price ID: ${PRICE_ID}<br>Après paiement, accès premium activé automatiquement</p>
+      <div id="sub-status" style="margin-top:16px"></div>
+    </div>
+  </section>`;
 }
 
-// ===== NOTICES =====
-function setPaymentNotice(message, link=""){
-  localStorage.setItem("escorhub-payment-notice", JSON.stringify({message, link}));
-  renderNotice();
-  showToast(message, "info", 6000);
+function productsPage(){return `<section class="section"><h2>Catalogue complet ${state.isPremium?'<span style="background:var(--success);color:#fff;padding:4px 10px;border-radius:20px;font-size:0.7rem">Abonné</span>':''}</h2><div class="product-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:16px">${state.products.map(card).join("")||"<p>Aucun produit - ajoutez en admin</p>"}</div></section>`}
+function card(p){return `<div style="border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)"><div style="background-image:url('${esc(p.image||'')}');height:160px;background-size:cover;background-position:center"></div><div style="padding:10px"><h3>${esc(p.nom)} ${euro(p.prix)}</h3><button class="btn-primary small" data-action="commander" data-id="${esc(p.id)}">COMMANDER</button> <button class="btn-secondary small" data-action="view-product" data-id="${esc(p.id)}">Voir</button></div></div>`}
+function productPage(id){const p=state.products.find(x=>String(x.id)===String(id)); if(!p) return `<h1>Produit introuvable</h1>`; return `<section class="page-shell"><a href="#/products" class="btn-secondary">Retour</a><h1>${esc(p.nom)} - ${euro(p.prix)}</h1><img src="${esc(p.image||'')}" style="width:100%;max-width:400px;height:300px;object-fit:cover;border-radius:10px"/><p>Prix: ${euro(p.prix)} - Telegram: ${esc(p.telegram_username||p.telegram_link||'config admin')}</p><button class="btn-primary full" data-action="commander" data-id="${esc(p.id)}">COMMANDER → /payment?product=${esc(p.id)} → Telegram</button></section>`}
+function paymentPage(pid){
+  const p=state.products.find(x=>String(x.id)===String(pid)); if(!p) return `<h1>Produit introuvable</h1>`; const u=getUser(); if(!u){setPending({productId:p.id,price:Number(p.prix),name:p.nom}); return `<section class="page-shell centered"><h1>Connexion requise</h1><p>Vous devez être connecté pour commander ${esc(p.nom)}</p><a href="#/login" class="btn-primary">Connexion</a></section>`}
+  // PREMIUM CHECK - serveur vérifie, pas frontend seul
+  if(!state.isPremium && u.role!=="admin"){ return subscriptionRequiredScreen(); }
+  const bal=Number(u.balance||0), price=Number(p.prix||0), miss=Math.max(0,price-bal), can=bal>=price;
+  return `<section class="page-shell"><h1>PAGE PAIEMENT /payment?product=${esc(p.id)} ${state.isPremium?'<span style="background:var(--success);color:#fff;padding:4px 10px;border-radius:20px;font-size:0.7rem;margin-left:10px"><i class="fa-solid fa-crown"></i> Abonné</span>':''}</h1><p>Produit: ${esc(p.nom)} Prix: ${euro(price)} Solde: ${euro(bal)} Manquant: ${euro(miss)}</p>
+  ${can?`<button class="btn-primary full" data-action="pay-product" data-id="${esc(p.id)}" data-price="${price}">PAYER ${price.toFixed(0)}€ → ${euro(bal-price)} → commande → Telegram</button>`:`<div style="background:rgba(255,0,0,0.1);padding:10px;border-radius:8px">Solde insuffisant - Prix ${euro(price)} Solde ${euro(bal)} Manque ${euro(miss)}</div><button class="btn-primary full" data-action="recharge-for-product" data-id="${esc(p.id)}" data-missing="${miss}" data-price="${price}">RECHARGER MON COMPTE</button>`}
+  <p><small>Après profil choisi → redirection Telegram ${tgUrl(p)}</small></p></section>`;
 }
-function clearPaymentNotice(){ localStorage.removeItem("escorhub-payment-notice"); renderNotice(); }
-function renderNotice(){
-  const notice=$("#site-notice");
-  if(!notice) return;
+function ordersPage(){
+  const u=getUser(); if(!u){location.hash="#/login";return""} if(!state.isPremium && u.role!=="admin") return subscriptionRequiredScreen();
+  const orders=(state.transactions||[]).filter(t=>String(t.user_id)===String(u.id)&&t.type==='purchase'); return `<section class="page-shell"><h1>Mes commandes (${orders.length}) ${state.isPremium?'<span style="background:var(--success);color:#fff;padding:4px 10px;border-radius:20px;font-size:0.7rem"><i class="fa-solid fa-crown"></i> Abonné</span>':''}</h1>${orders.map(o=>{const prod=state.products.find(p=>String(p.id)===String(o.product_id)); return `<div style="border:1px solid var(--line);padding:10px;margin-bottom:8px;border-radius:8px"><strong>Commande #${esc(o.id.slice(0,8))} ${esc(prod?.nom||'')} ${euro(Math.abs(Number(o.amount)))} Payée</strong><br><button class="btn-primary small" data-action="view-order" data-id="${esc(o.id)}">VOIR LA COMMANDE</button></div>`}).join("")||"Aucune commande"}</section>`;
+}
+function orderDetail(oid){const u=getUser(); if(!state.isPremium && u?.role!=="admin") return subscriptionRequiredScreen(); const o=(state.transactions||[]).find(t=>String(t.id)===String(oid)); if(!o) return `<h1>Commande introuvable</h1>`; const prod=state.products.find(p=>String(p.id)===String(o.product_id)); const url=tgUrl(prod); return `<section class="page-shell"><a href="#/orders" class="btn-secondary">Retour</a><h1>Commande #${esc(o.id.slice(0,8))} Payée</h1><p>Produit: ${esc(prod?.nom||'')} Prix: ${euro(Math.abs(Number(o.amount)))}</p><a href="${esc(url)}" target="_blank" class="btn-primary full"><i class="fa-brands fa-telegram"></i> CONTACTER SUR TELEGRAM</a></section>`}
+function home(){const u=getUser(); const isSub=state.isPremium; return `<section class="section"><div style="display:flex;justify-content:space-between;align-items:center"><h2>Produits - COMMANDER → paiement → Telegram ${isSub?'<span style="background:var(--success);color:#fff;padding:4px 10px;border-radius:20px;font-size:0.7rem">Abonné</span>':''}</h2>${u&&!isSub&&u.role!=="admin"?`<button class="btn-primary" id="home-subscribe-btn"><i class="fa-solid fa-crown"></i> S'abonner 5,99€</button>`:""}</div><div class="product-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:16px">${state.products.map(card).join("")}</div></section>`}
+function loginPage(){const pend=getPending(); return `<section class="auth-page"><div class="auth-card"><h1>CONNEXION</h1>${pend?`<p>Produit: ${esc(pend.name)} - Retour auto /payment?product=${esc(pend.productId)}</p>`:""}<form id="login-form"><label>Email<input type="email" name="email" required></label><label>Mot de passe<input type="password" name="password" required></label><button class="btn-primary">Connexion</button></form></div></section>`}
+function signupPage(){return `<section class="auth-page"><div class="auth-card"><h1>Inscription</h1><form id="signup-form"><label>Nom<input name="fullName" required></label><label>Email<input type="email" name="email" required></label><label>Mot de passe<input type="password" name="password" required></label><button class="btn-primary">Créer</button></form></div></section>`}
+function walletPage(){
+  const u=getUser(); if(!u){location.hash="#/login";return""} if(!state.isPremium && u.role!=="admin") return subscriptionRequiredScreen();
+  const bal=u.balance||0, methods=state.paymentMethods||[], pend=getPending(); let miss=0, pendProd=null; if(pend){pendProd=state.products.find(p=>String(p.id)===String(pend.productId)); if(pendProd) miss=Math.max(0,Number(pendProd.prix)-bal)} const selId=getPM(), sel=selId?methods.find(m=>String(m.id)===String(selId)):null;
+  return `<section class="page-shell"><h1>Recharger Solde ${euro(bal)} ${state.isPremium?'<span style="background:var(--success);color:#fff;padding:4px 8px;border-radius:20px;font-size:0.6rem">Abonné</span>':''}</h1><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div><h3>Moyens</h3>${methods.map(m=>`<button class="btn-secondary" data-select-method="${esc(m.id)}" style="width:100%;text-align:left;margin-bottom:6px">${esc(m.name)}</button>`).join("")}</div><div>${!sel?`<p>Choisissez moyen</p>`:`<h3>${esc(sel.name)}</h3><button class="btn-primary full" data-action="continue-to-payment">CONTINUER</button><div id="after-continue" style="display:none;margin-top:10px"><form id="wallet-recharge-form" style="display:grid;gap:6px"><label>Montant<input type="number" id="wallet-amount" value="${miss.toFixed(0)}" required></label><label>Réf<input type="text" id="wallet-ref"></label><label>Hash TX<input type="text" id="wallet-crypto-hash"></label><label>Preuve<input type="file" id="wallet-proof" accept="image/*,application/pdf" required></label><button class="btn-primary">ENVOYER pending</button></form></div>`}</div></div></section>`;
+}
+function adminPage(){const u=getUser(); if(!u||u.role!=="admin") return `<h1>Admin uniquement</h1>`; return `<section class="page-shell"><h1>Admin - Produits Telegram + Paddle Abonnements</h1><p>Abonnés actifs: ${(state.profiles||[]).filter(p=>p.is_premium).length||'?'}</p><form id="admin-product-form" style="display:grid;gap:6px;max-width:400px"><input type="hidden" id="product-id"><label>Nom<input id="prod-nom" required></label><label>Prix<input type="number" id="prod-prix" required></label><label>Telegram<input id="prod-telegram" placeholder="@polarish87"></label><button class="btn-primary">Enregistrer</button></form><div style="margin-top:16px">${state.products.map(p=>`<div style="border:1px solid var(--line);padding:6px;margin-bottom:4px">${esc(p.nom)} ${euro(p.prix)} TG:${esc(p.telegram_username||p.telegram_link||'non')} <button class="mini-btn" data-action="edit-product" data-id="${esc(p.id)}">Edit</button></div>`).join("")}</div></section>`}
+function notFound(){return `<section class="page-shell"><h1>404</h1></section>`}
+
+// PADDLE CHECKOUT - lien paiement 5,99€
+async function openCheckout(){
+  const u=getUser(); if(!u){location.hash="#/login"; return}
+  const statusEl=$("#sub-status")||$("#home-sub-status")||document.getElementById("sub-status");
+  if(statusEl) statusEl.innerHTML=`<div style="background:rgba(255,138,0,0.1);padding:10px;border-radius:8px"><i class="fa-solid fa-spinner fa-spin"></i> Ouverture checkout Paddle... Price ${PRICE_ID} 5,99€/mois<br><small>Token: ${(window.PADDLE_CLIENT_TOKEN||'').slice(0,12)}... Env: ${window.PADDLE_ENV}</small></div>`;
   try{
-    const raw=localStorage.getItem("escorhub-payment-notice");
-    if(!raw){ notice.classList.add("hidden"); notice.innerHTML=""; return; }
-    const data=JSON.parse(raw);
-    if(!data?.message){ notice.classList.add("hidden"); notice.innerHTML=""; return; }
-    notice.innerHTML = `<p><i class="fa-solid fa-bell" style="margin-right:8px;color:var(--accent)"></i>${escapeHtml(data.message)} ${data.link?`<a href="${escapeHtml(data.link)}" target="_blank" rel="noopener noreferrer"><i class="fa-solid fa-arrow-up-right-from-square" style="margin-right:4px"></i>Poursuivre</a>`:""} <button onclick="localStorage.removeItem('escorhub-payment-notice');this.closest('#site-notice').classList.add('hidden')" style="margin-left:12px;background:transparent;border:1px solid #444;color:#aaa;padding:4px 10px;border-radius:6px;font-size:0.8rem;cursor:pointer"><i class="fa-solid fa-xmark"></i> Fermer</button></p>`;
-    notice.classList.remove("hidden");
-  } catch { notice.classList.add("hidden"); notice.innerHTML=""; }
-}
-
-// ===== BANNER DYNAMIQUE =====
-function renderBanner(){
-  const banner=$("#site-banner");
-  if(!banner) return;
-  const ads=(state.ads||[]).filter(a=>a.status==="active").slice(0,4);
-  if(!ads.length){ banner.innerHTML=""; return; }
-  banner.innerHTML = `<div class="banner-wrap">${ads.map(ad=>{
-    const mediaHtml = ad.media_type==="image"||ad.mediaType==="image"
-      ? `<img src="${escapeHtml(ad.media_url||ad.mediaUrl)}" alt="${escapeHtml(ad.title)}" loading="lazy" />`
-      : (ad.media_type==="video"||ad.mediaType==="video")
-        ? `<video controls src="${escapeHtml(ad.media_url||ad.mediaUrl)}"></video>`
-        : `<div class="banner-text">${escapeHtml(ad.text||ad.title)}</div>`;
-    return `<div class="banner-item" style="animation: fadeIn .5s ease"><div style="position:relative;overflow:hidden;border-radius:10px">${mediaHtml}<div style="position:absolute;top:6px;left:6px;background:var(--accent);color:#111;padding:2px 8px;border-radius:20px;font-size:0.65rem;font-weight:800;display:flex;align-items:center;gap:4px"><i class="fa-solid fa-crown"></i> SPONSOR</div></div><div class="banner-copy"><span class="banner-tag"><i class="fa-solid fa-bolt" style="margin-right:4px"></i>Annonce sponsorisée</span><h3>${escapeHtml(ad.title)}</h3><p>${escapeHtml(ad.text||"Annonce sponsorisée")}</p></div></div>`;
-  }).join("")}</div>`;
-}
-
-// ===== HERO BACKGROUND ALEATOIRE - CHANGE TOUTES LES HEURES - FEMME SEXY GLAMOUR =====
-let heroIntervalHour=null;
-let heroIntervalZoom=null;
-let heroCurrentIdx=-1;
-
-function getRandomHeroIdx(exclude=-1){
-  if(!CONFIG.HERO_IMAGES || !CONFIG.HERO_IMAGES.length) return 0;
-  if(CONFIG.HERO_IMAGES.length===1) return 0;
-  let idx;
-  let attempts=0;
-  do{
-    idx=Math.floor(Math.random()*CONFIG.HERO_IMAGES.length);
-    attempts++;
-  }while(idx===exclude && attempts<20);
-  return idx;
-}
-
-function applyHeroBg(idx, immediate=false){
-  const hero=document.querySelector(".hero");
-  if(!hero) return;
-  const img=CONFIG.HERO_IMAGES[idx];
-  if(!img) return;
-
-  // Assure structure bg layers
-  let bgActive=hero.querySelector(".hero-bg.active");
-  let bgNext=hero.querySelector(".hero-bg.next");
-  if(!bgActive || !bgNext){
-    hero.querySelectorAll(".hero-bg").forEach(el=>el.remove());
-    bgActive=document.createElement("div");
-    bgActive.className="hero-bg active";
-    bgNext=document.createElement("div");
-    bgNext.className="hero-bg next";
-    hero.prepend(bgNext);
-    hero.prepend(bgActive);
-  }
-
-  if(immediate){
-    bgActive.style.backgroundImage=`url("${img}")`;
-    bgActive.style.opacity="1";
-    bgNext.style.opacity="0";
-    bgActive.style.transform="scale(1.05)";
-  } else {
-    // crossfade aléatoire
-    bgNext.style.backgroundImage=`url("${img}")`;
-    bgNext.style.opacity="0";
-    bgNext.style.transform="scale(1.12)";
-    // force reflow
-    void bgNext.offsetWidth;
-    bgNext.style.opacity="1";
-    bgActive.style.opacity="0";
-    bgActive.style.transform="scale(1.05)";
-    setTimeout(()=>{
-      bgActive.style.backgroundImage=bgNext.style.backgroundImage;
-      bgActive.style.opacity="1";
-      bgActive.style.transform="scale(1.05)";
-      bgNext.style.opacity="0";
-    },1200);
-  }
-
-  heroCurrentIdx=idx;
-  try{
-    localStorage.setItem("escorhub-hero-idx", String(idx));
-    localStorage.setItem("escorhub-hero-ts", String(Date.now()));
-  }catch{}
-
-  // preload prochaine image aléatoire glamour
-  const preloadIdx=getRandomHeroIdx(idx);
-  const preloadImg=new Image();
-  preloadImg.src=CONFIG.HERO_IMAGES[preloadIdx];
-}
-
-function startHeroSlideshow(){
-  const hero=document.querySelector(".hero");
-  if(!hero){
-    if(heroIntervalHour) clearInterval(heroIntervalHour);
-    if(heroIntervalZoom) clearInterval(heroIntervalZoom);
-    return;
-  }
-
-  const storedIdx=parseInt(localStorage.getItem("escorhub-hero-idx")||"",10);
-  const storedTs=parseInt(localStorage.getItem("escorhub-hero-ts")||"0",10);
-  const oneHour=3600000;
-  const now=Date.now();
-  let initialIdx;
-
-  if(!isNaN(storedIdx) && storedIdx>=0 && storedIdx<CONFIG.HERO_IMAGES.length && (now-storedTs)<oneHour){
-    initialIdx=storedIdx;
-  } else {
-    initialIdx=getRandomHeroIdx(heroCurrentIdx);
-  }
-
-  applyHeroBg(initialIdx,true);
-
-  if(heroIntervalHour) clearInterval(heroIntervalHour);
-  if(heroIntervalZoom) clearInterval(heroIntervalZoom);
-
-  // Changement aléatoire toutes les heures - femme sexy glamour
-  heroIntervalHour=setInterval(()=>{
-    const next=getRandomHeroIdx(heroCurrentIdx);
-    applyHeroBg(next,false);
-  }, oneHour);
-
-  // Effet zoom subtil toutes les 8s pour dynamisme glamour
-  let zoomed=false;
-  heroIntervalZoom=setInterval(()=>{
-    const active=document.querySelector(".hero-bg.active");
-    if(active){
-      active.style.transform=zoomed?"scale(1.05)":"scale(1.12)";
-      zoomed=!zoomed;
+    const {data:{session}}=await supabase.auth.getSession(); 
+    if(!session?.access_token) throw new Error("Session expirée, reconnectez-vous");
+    const res=await fetch('/api/paddle/create-checkout',{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`}}); 
+    if(!res.ok){ const txt=await res.text(); throw new Error(`API checkout ${res.status}: ${txt.slice(0,200)}`); }
+    const data=await res.json();
+    // Charge Paddle.js v2 si besoin
+    if(!window.Paddle){
+      await new Promise((r,j)=>{
+        const s=document.createElement('script'); 
+        s.src='https://cdn.paddle.com/paddle/v2/paddle.js'; 
+        s.onload=()=>{console.log("Paddle.js loaded"); r();}; 
+        s.onerror=()=>j(new Error("Impossible charger Paddle.js - vérifiez connexion"));
+        document.head.appendChild(s);
+      });
     }
-  },8000);
-}
-
-// ===== DYNAMIQUE : OBSERVER ANIMATION =====
-function initDynamicEffects(){
-  const observer = new IntersectionObserver((entries)=>{
-    entries.forEach(entry=>{
-      if(entry.isIntersecting){
-        entry.target.style.opacity="1";
-        entry.target.style.transform="translateY(0)";
+    const clientToken=window.PADDLE_CLIENT_TOKEN||CONFIG.PADDLE_CLIENT_TOKEN||""; 
+    const env=window.PADDLE_ENV||"production";
+    if(!clientToken) throw new Error("PADDLE_CLIENT_TOKEN manquant");
+    console.log("Init Paddle", env, clientToken.slice(0,15)+"...");
+    window.Paddle.Environment.set(env); 
+    window.Paddle.Initialize({token:clientToken});
+    
+    // Fallback lien direct si overlay bloque
+    const fallbackUrl=`https://buy.paddle.com/checkout?items[0][priceId]=${data.priceId||PRICE_ID}&customer[email]=${encodeURIComponent(u.email)}&customData[user_id]=${encodeURIComponent(u.id)}`;
+    if(statusEl) statusEl.innerHTML+=`<div style="margin-top:10px"><a href="${fallbackUrl}" target="_blank" class="btn-secondary small">Si popup ne s'ouvre pas, cliquez ici - Paiement direct</a><br><small style="color:var(--muted)">Lien: ${esc(fallbackUrl.slice(0,60))}...</small></div>`;
+    
+    window.Paddle.Checkout.open({
+      items:[{priceId: data.priceId||PRICE_ID, quantity:1}],
+      customer:{email: u.email||data.customerEmail},
+      customData:{user_id: u.id},
+      settings:{displayMode:'overlay', theme:'dark', locale:'fr'},
+      eventCallback: async (ev)=>{
+        console.log("Paddle event", ev);
+        if(ev.name==='checkout.completed'){
+          if(statusEl) statusEl.innerHTML=`<div style="background:rgba(0,255,0,0.1);padding:12px;border-radius:8px"><i class="fa-solid fa-check"></i> Paiement confirmé ! Activation premium en cours... Attente webhook Paddle → /api/paddle-webhook<br><small>Transaction: ${esc(ev.data?.transaction_id||'')}</small></div>`;
+          let tries=0; const interval=setInterval(async()=>{
+            tries++; const st=await checkPremium(); 
+            if(st.isActive){clearInterval(interval); toast("✅ Abonnement activé !","success",6000); if(statusEl) statusEl.innerHTML=`<div style="background:rgba(0,255,0,0.15);border:2px solid var(--success);padding:16px;border-radius:12px;text-align:center"><h3 style="margin:0;color:var(--success)"><i class="fa-solid fa-crown"></i> Abonnement actif !</h3><p>5,99€/mois - Premium activé</p><a href="#/" class="btn-primary" style="margin-top:12px">Accéder au site</a></div>`; await hydrate(); render();} 
+            else if(tries>15){clearInterval(interval); if(statusEl) statusEl.innerHTML+=`<p style="color:var(--muted)">Webhook en attente... Si ça tarde, contact admin ou recharge page. Status: ${JSON.stringify(st).slice(0,200)}</p>`;}
+          },3000);
+        } else if(ev.name==='checkout.error' || ev.name==='checkout.closed'){
+          console.warn("Paddle checkout error/closed", ev);
+          if(ev.name==='checkout.error' && statusEl) statusEl.innerHTML+=`<div style="background:rgba(255,0,0,0.1);padding:8px;border-radius:8px;margin-top:8px">Erreur Paddle: ${esc(ev.data?.error||JSON.stringify(ev).slice(0,200))}<br><a href="${fallbackUrl}" target="_blank">Essayez paiement direct</a></div>`;
+        }
       }
     });
-  }, { threshold:0.1 });
-
-  $$(".product-card").forEach((card,i)=>{
-    card.style.opacity="0";
-    card.style.transform="translateY(20px)";
-    card.style.transition=`opacity .5s ease ${i*0.05}s, transform .5s ease ${i*0.05}s`;
-    observer.observe(card);
-  });
-}
-
-// ===== COMPONENTS AVEC FONT AWESOME PRO =====
-function renderProductCard(p){
-  const image=p.image||"";
-  const isNew = p.created_at && (Date.now() - new Date(p.created_at).getTime()) < 86400000*2;
-  return `
-  <article class="product-card">
-    ${isNew?`<div style="position:absolute;top:10px;left:10px;z-index:3;background:var(--success);color:#fff;padding:4px 10px;border-radius:20px;font-size:0.7rem;font-weight:800;display:flex;align-items:center;gap:4px"><i class="fa-solid fa-sparkles"></i> NEW</div>`:""}
-    <div class="product-image" style="background-image:url('${escapeHtml(image)}')">
-      <div style="position:absolute;bottom:10px;left:10px;z-index:3;display:flex;gap:6px">
-        <span style="background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);color:#fff;padding:4px 8px;border-radius:20px;font-size:0.75rem;display:flex;align-items:center;gap:4px"><i class="fa-solid fa-eye"></i> ${Math.floor(Math.random()*500+50)}</span>
-        <span style="background:rgba(0,0,0,0.7);backdrop-filter:blur(6px);color:#fff;padding:4px 8px;border-radius:20px;font-size:0.75rem;display:flex;align-items:center;gap:4px"><i class="fa-solid fa-heart"></i> ${Math.floor(Math.random()*100+5)}</span>
-      </div>
-    </div>
-    <div class="product-body">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-        <h3 style="display:flex;align-items:center;gap:6px"><i class="fa-solid fa-user" style="color:var(--accent);font-size:0.9em"></i>${escapeHtml(p.nom||p.title||"Profil")}</h3>
-        <span style="color:var(--success);font-size:0.75rem;display:flex;align-items:center;gap:4px"><i class="fa-solid fa-circle" style="font-size:0.5em"></i> En ligne</span>
-      </div>
-      <p class="meta" style="display:flex;gap:12px;flex-wrap:wrap">
-        <span><i class="fa-solid fa-cake-candles" style="margin-right:4px;color:var(--muted)"></i>${escapeHtml(p.age||"-")} ans</span>
-        <span><i class="fa-solid fa-location-dot" style="margin-right:4px;color:var(--muted)"></i>${escapeHtml(p.lieu||"-")}</span>
-      </p>
-      <div class="price-row">
-        <strong><i class="fa-solid fa-dollar-sign"></i> ${formatPrice(p.prix||p.price).replace('$','')}</strong>
-        <button class="btn-primary small" data-action="buy" data-id="${escapeHtml(p.id)}"><i class="fa-solid fa-bolt" style="margin-right:4px"></i>Choisir</button>
-      </div>
-    </div>
-  </article>`;
-}
-
-// ===== PAGES DYNAMIQUES =====
-function renderHome(){
-  const products = state.searchQuery ? state.products.filter(p=> 
-    `${p.nom} ${p.lieu} ${p.age} ${p.prix}`.toLowerCase().includes(state.searchQuery.toLowerCase())
-  ) : state.products;
-
-  return `
-    <section class="hero">
-      <div class="hero-content">
-        <p class="eyebrow"><i class="fa-solid fa-fire" style="margin-right:6px"></i>EscortHub • Premium • Since 2013</p>
-        <h1>Découvre des offres rapides, sécurisées et visibles.</h1>
-        <p>Choisis un profil, valide ton paiement et profite d'un accès simple avec TransCash. Monde entier, 195 pays.</p>
-        <div class="hero-actions">
-          <a href="#/products" class="btn-primary"><i class="fa-solid fa-compass" style="margin-right:8px"></i>Voir les produits</a>
-          <a href="/post.html" class="btn-secondary"><i class="fa-solid fa-plus" style="margin-right:8px"></i>Poster une annonce</a>
-        </div>
-        <div class="stats-bar">
-          <div class="stat-item"><i class="fa-solid fa-users"></i><strong>${state.products.length}</strong> Profils</div>
-          <div class="stat-item"><i class="fa-solid fa-earth-americas"></i><strong>195</strong> Pays</div>
-          <div class="stat-item"><i class="fa-solid fa-bolt"></i><strong>24/7</strong> Disponible</div>
-          <div class="stat-item"><i class="fa-solid fa-shield-halved"></i><strong>100%</strong> Sécurisé</div>
-        </div>
-      </div>
-    </section>
-
-    <section class="section">
-      <div class="section-head">
-        <h2><i class="fa-solid fa-fire" style="color:var(--accent);margin-right:8px"></i>Profils populaires</h2>
-        <a href="#/products"><i class="fa-solid fa-arrow-right" style="margin-right:4px"></i>Tout afficher</a>
-      </div>
-      ${state.searchQuery?`<p style="color:var(--muted);margin-bottom:16px"><i class="fa-solid fa-magnifying-glass" style="margin-right:6px"></i>Résultats pour "${escapeHtml(state.searchQuery)}" : ${products.length} profils</p>`:""}
-      <div class="product-grid">
-        ${products.length ? products.map(renderProductCard).join("") : `<p class="empty-state"><i class="fa-solid fa-inbox" style="margin-right:8px"></i>Aucun produit disponible. L'admin doit en ajouter.</p>`}
-      </div>
-    </section>`;
-}
-
-function renderProductsPage(){
-  const products = state.searchQuery ? state.products.filter(p=> 
-    `${p.nom} ${p.lieu} ${p.age} ${p.prix}`.toLowerCase().includes(state.searchQuery.toLowerCase())
-  ) : state.products;
-
-  return `
-    <section class="page-shell">
-      <div class="section-head">
-        <h2><i class="fa-solid fa-grid" style="color:var(--accent);margin-right:8px"></i>Catalogue complet</h2>
-        <span style="color:var(--muted);display:flex;align-items:center;gap:6px"><i class="fa-solid fa-users"></i>${products.length} profils</span>
-      </div>
-      <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap">
-        <div style="flex:1;min-width:260px;position:relative">
-          <i class="fa-solid fa-magnifying-glass" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--muted)"></i>
-          <input type="text" id="catalog-search" placeholder="Filtrer par nom, ville, prix..." value="${escapeHtml(state.searchQuery)}" style="width:100%;padding-left:36px" />
-        </div>
-        <button class="btn-secondary" id="clear-filter"><i class="fa-solid fa-xmark" style="margin-right:6px"></i>Effacer</button>
-      </div>
-      <div class="product-grid">
-        ${products.length ? products.map(renderProductCard).join("") : `<p class="empty-state"><i class="fa-solid fa-face-frown" style="margin-right:8px"></i>Aucun produit ne correspond à votre recherche.</p>`}
-      </div>
-    </section>`;
-}
-
-function renderLoginPage(){
-  return `
-    <section class="auth-page">
-      <div class="auth-card" style="animation: scaleIn .4s ease">
-        <div style="text-align:center;margin-bottom:20px">
-          <div style="width:60px;height:60px;background:linear-gradient(135deg, var(--accent), var(--accent-2));border-radius:16px;display:grid;place-items:center;margin:0 auto 12px"><i class="fa-solid fa-right-to-bracket" style="font-size:1.5rem;color:#111"></i></div>
-          <h1>Connexion</h1><p class="subtitle">Accédez à votre espace EscortHub.</p>
-        </div>
-        <form id="login-form">
-          <label><span><i class="fa-solid fa-envelope" style="margin-right:4px"></i>Adresse e-mail</span><input type="email" name="email" placeholder="vous@exemple.com" autocomplete="email" required /></label>
-          <label><span><i class="fa-solid fa-lock" style="margin-right:4px"></i>Mot de passe</span><input type="password" name="password" placeholder="Entrez votre mot de passe" required /></label>
-          <button type="submit" class="btn-primary auth-btn"><i class="fa-solid fa-arrow-right-to-bracket" style="margin-right:8px"></i>Se connecter</button>
-        </form>
-        <p class="auth-link">Pas de compte ? <a href="#/signup"><i class="fa-solid fa-user-plus" style="margin-right:4px"></i>Inscrivez-vous</a></p>
-      </div>
-    </section>`;
-}
-
-function renderSignupPage(){
-  return `
-    <section class="auth-page">
-      <div class="auth-card" style="animation: scaleIn .4s ease">
-        <div style="text-align:center;margin-bottom:20px">
-          <div style="width:60px;height:60px;background:linear-gradient(135deg, var(--accent), var(--accent-2));border-radius:16px;display:grid;place-items:center;margin:0 auto 12px"><i class="fa-solid fa-user-plus" style="font-size:1.5rem;color:#111"></i></div>
-          <h1>Inscription</h1><p class="subtitle">Créez votre compte en 30 secondes.</p>
-        </div>
-        <form id="signup-form">
-          <label><span><i class="fa-solid fa-user" style="margin-right:4px"></i>Nom complet</span><input type="text" name="fullName" placeholder="Votre nom complet" required /></label>
-          <label><span><i class="fa-solid fa-at" style="margin-right:4px"></i>Nom d'utilisateur</span><input type="text" name="username" placeholder="Choisissez un pseudo" required /></label>
-          <label><span><i class="fa-solid fa-envelope" style="margin-right:4px"></i>Adresse e-mail</span><input type="email" name="email" placeholder="vous@exemple.com" autocomplete="email" required /></label>
-          <label><span><i class="fa-solid fa-lock" style="margin-right:4px"></i>Mot de passe</span><input type="password" name="password" placeholder="Choisissez un mot de passe" required /></label>
-          <button type="submit" class="btn-primary auth-btn"><i class="fa-solid fa-rocket" style="margin-right:8px"></i>S'inscrire</button>
-        </form>
-        <p class="auth-link">Déjà inscrit ? <a href="#/login"><i class="fa-solid fa-right-to-bracket" style="margin-right:4px"></i>Connectez-vous</a></p>
-      </div>
-    </section>`;
-}
-
-function renderAdminPage(){
-  const user=getCurrentUser();
-  if(!user||user.role!=="admin"){
-    return `<section class="page-shell centered" style="text-align:center"><div style="width:80px;height:80px;background:rgba(255,90,90,0.15);border-radius:20px;display:grid;place-items:center;margin:0 auto 16px"><i class="fa-solid fa-lock" style="font-size:2rem;color:var(--danger)"></i></div><h1>Accès réservé</h1><p>Connectez-vous avec l'admin pour gérer le site.</p><a href="#/login" class="btn-primary"><i class="fa-solid fa-right-to-bracket" style="margin-right:8px"></i>Aller à la connexion</a></section>`;
-  }
-  const products=state.products;
-  const payments=state.payments;
-  const ads=state.ads;
-  return `
-    <section class="admin-page">
-      <div class="admin-topbar">
-        <div>
-          <p class="eyebrow"><i class="fa-solid fa-shield-halved" style="margin-right:6px"></i>Administration • Since 2013</p>
-          <h1><i class="fa-solid fa-gauge-high" style="margin-right:10px;color:var(--accent)"></i>Dashboard</h1>
-          <p style="color:var(--muted);margin:6px 0 0;display:flex;gap:12px;flex-wrap:wrap"><span><i class="fa-solid fa-envelope" style="margin-right:4px"></i>${escapeHtml(user.email)}</span><span><i class="fa-solid fa-credit-card" style="margin-right:4px"></i>${payments.length} paiements</span><span><i class="fa-solid fa-box" style="margin-right:4px"></i>${products.length} produits</span></p>
-        </div>
-        <button class="logout-btn" id="admin-logout-btn"><i class="fa-solid fa-right-from-bracket" style="margin-right:6px"></i>Déconnexion</button>
-      </div>
-
-      <div class="admin-grid">
-        <div class="admin-panel">
-          <h2><i class="fa-solid fa-gear" style="margin-right:8px;color:var(--accent)"></i>Paramètres redirection</h2>
-          <form id="redirect-settings-form">
-            <label><span><i class="fa-brands fa-telegram" style="margin-right:4px"></i>Lien après validation</span><input type="url" id="payment-success-link" value="${escapeHtml(getRedirectUrl())}" placeholder="https://t.me/..." required /></label>
-            <div class="admin-actions"><button type="submit" class="btn-primary"><i class="fa-solid fa-floppy-disk" style="margin-right:6px"></i>Enregistrer le lien</button></div>
-          </form>
-          <div style="margin-top:18px;padding-top:18px;border-top:1px solid var(--line)">
-            <h3 style="font-size:1rem;margin:0 0 10px;display:flex;align-items:center;gap:6px"><i class="fa-solid fa-link"></i>Lien actuel</h3>
-            <code style="display:block;background:var(--panel-soft);padding:10px;border-radius:8px;word-break:break-all;font-size:0.85rem">${escapeHtml(getRedirectUrl())}</code>
-          </div>
-        </div>
-
-        <div class="admin-panel">
-          <h2><i class="fa-solid fa-plus" style="margin-right:8px;color:var(--accent)"></i>Ajouter / modifier un produit</h2>
-          <form id="admin-product-form">
-            <input type="hidden" name="id" id="product-id" />
-            <label><span><i class="fa-solid fa-user" style="margin-right:4px"></i>Nom *</span><input type="text" name="nom" placeholder="Nom du profil" required /></label>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-              <label><span><i class="fa-solid fa-cake-candles" style="margin-right:4px"></i>Âge *</span><input type="number" name="age" placeholder="22" min="18" required /></label>
-              <label><span><i class="fa-solid fa-dollar-sign" style="margin-right:4px"></i>Prix *</span><input type="number" name="prix" placeholder="150" min="1" required /></label>
-            </div>
-            <label><span><i class="fa-solid fa-location-dot" style="margin-right:4px"></i>Lieu *</span><input type="text" name="lieu" placeholder="Cotonou" required /></label>
-            <label><span><i class="fa-solid fa-upload" style="margin-right:4px"></i>Image / Vidéo</span><input type="file" name="imageUpload" accept="image/*,video/*" /></label>
-            <label><span><i class="fa-solid fa-link" style="margin-right:4px"></i>Ou URL</span><input type="url" name="image" placeholder="https://..." /></label>
-            <div class="admin-actions">
-              <button type="submit" class="btn-primary"><i class="fa-solid fa-check" style="margin-right:6px"></i>Enregistrer</button>
-              <button type="button" class="btn-secondary" id="reset-product-form"><i class="fa-solid fa-rotate" style="margin-right:6px"></i>Réinitialiser</button>
-            </div>
-          </form>
-        </div>
-      </div>
-
-      <div class="admin-panel">
-        <h2><i class="fa-solid fa-box" style="margin-right:8px"></i>Produits (${products.length})</h2>
-        <div class="admin-list">
-          ${products.length ? products.map(p=>`
-            <div class="admin-item">
-              <div><strong><i class="fa-solid fa-user" style="margin-right:6px;color:var(--accent)"></i>${escapeHtml(p.nom)}</strong><p><i class="fa-solid fa-cake-candles" style="margin-right:4px"></i>${escapeHtml(p.age)} | <i class="fa-solid fa-location-dot" style="margin-right:4px"></i>${escapeHtml(p.lieu)} | ${formatPrice(p.prix)}</p></div>
-              <div class="admin-item-actions">
-                <button class="mini-btn" data-action="edit-product" data-id="${escapeHtml(p.id)}"><i class="fa-solid fa-pen"></i> Modifier</button>
-                <button class="mini-btn danger" data-action="delete-product" data-id="${escapeHtml(p.id)}"><i class="fa-solid fa-trash"></i> Supprimer</button>
-              </div>
-            </div>`).join("") : `<p class="empty-state"><i class="fa-solid fa-inbox"></i> Aucun produit.</p>`}
-        </div>
-      </div>
-
-      <div class="admin-section">
-        <h2><i class="fa-solid fa-credit-card" style="margin-right:8px"></i>Paiements reçus (${payments.length})</h2>
-        <div class="admin-list">
-          ${payments.length ? payments.map(pay=>`
-            <div class="payment-item ${pay.status||"pending"}" style="animation: fadeIn .3s ease">
-              <div class="payment-info">
-                <strong>${pay.target==="product"?`<i class="fa-solid fa-cart-shopping" style="margin-right:6px"></i>Achat produit`:`<i class="fa-solid fa-bullhorn" style="margin-right:6px"></i>Annonce`} • ${formatPrice(pay.amount)}</strong>
-                <p><i class="fa-solid fa-user" style="margin-right:4px"></i>${escapeHtml(pay.user_id?.slice(0,8)||"Anonyme")} | <i class="fa-solid fa-money-bill" style="margin-right:4px"></i>${escapeHtml(pay.method)} | <i class="fa-solid fa-circle-info" style="margin-right:4px"></i><b>${escapeHtml(pay.status)}</b></p>
-                <p><i class="fa-regular fa-clock" style="margin-right:4px"></i>${new Date(pay.created_at).toLocaleString("fr-FR")} | ID: ${escapeHtml(pay.id.slice(0,8))}</p>
-                ${pay.proof_url?`<div style="margin-top:8px"><button class="mini-btn" data-action="view-proof" data-path="${escapeHtml(pay.proof_url)}"><i class="fa-solid fa-eye"></i> Voir preuve</button><div class="proof-preview" id="proof-${escapeHtml(pay.id)}" style="margin-top:8px"></div></div>`:""}
-              </div>
-              <div class="admin-item-actions">
-                <button class="mini-btn success" data-action="accept-payment" data-id="${escapeHtml(pay.id)}"><i class="fa-solid fa-check"></i> Accepter</button>
-                <button class="mini-btn danger" data-action="decline-payment" data-id="${escapeHtml(pay.id)}"><i class="fa-solid fa-xmark"></i> Décliner</button>
-              </div>
-            </div>`).join("") : `<p class="empty-state"><i class="fa-solid fa-inbox"></i> Aucun paiement pour le moment.</p>`}
-        </div>
-      </div>
-
-      <div class="admin-section">
-        <h2><i class="fa-solid fa-bullhorn" style="margin-right:8px"></i>Annonces actives (${ads.length})</h2>
-        <div class="admin-list">
-          ${ads.length ? ads.map(ad=>`
-            <div class="admin-item">
-              <div><strong><i class="fa-solid fa-bullhorn" style="margin-right:6px;color:var(--accent)"></i>${escapeHtml(ad.title)}</strong><p>${escapeHtml(ad.text?.slice(0,80)||"")} • ${escapeHtml(ad.status)}</p></div>
-              <div class="admin-item-actions"><button class="mini-btn danger" data-action="delete-ad" data-id="${escapeHtml(ad.id)}"><i class="fa-solid fa-trash"></i> Retirer</button></div>
-            </div>`).join("") : `<p class="empty-state"><i class="fa-solid fa-inbox"></i> Aucune annonce active.</p>`}
-        </div>
-      </div>
-    </section>`;
-}
-
-function renderNotFound(){
-  return `<section class="page-shell centered" style="text-align:center;padding:80px 24px"><div style="width:100px;height:100px;background:rgba(255,138,0,0.1);border-radius:24px;display:grid;place-items:center;margin:0 auto 20px"><i class="fa-solid fa-map-signs" style="font-size:2.5rem;color:var(--accent)"></i></div><h1 style="font-size:4rem;margin:0">404</h1><p><i class="fa-solid fa-triangle-exclamation" style="margin-right:6px"></i>Cette page n'existe pas.</p><a href="#/" class="btn-primary"><i class="fa-solid fa-house" style="margin-right:8px"></i>Retour accueil</a></section>`;
-}
-function renderDiscussionPage(){
-  return `<section class="page-shell centered" style="text-align:center;padding:80px 24px"><div style="width:80px;height:80px;background:rgba(78,203,113,0.15);border-radius:20px;display:grid;place-items:center;margin:0 auto 20px"><i class="fa-solid fa-circle-check" style="font-size:2.5rem;color:var(--success)"></i></div><h1>Paiement validé</h1><p>Votre paiement a été validé. Vous pouvez poursuivre.</p><a href="${escapeHtml(getRedirectUrl())}" target="_blank" class="btn-primary"><i class="fa-brands fa-telegram" style="margin-right:8px"></i>Aller à la discussion</a><br><br><a href="#/" class="btn-secondary"><i class="fa-solid fa-house" style="margin-right:8px"></i>Retour accueil</a></section>`;
-}
-
-// ===== PRODUCTS API =====
-async function saveProducts(product){
-  const payload={ ...(product.id?{id:product.id}:{}), nom:product.nom, age:Number(product.age), lieu:product.lieu, prix:Number(product.prix), image:product.image, updated_at: new Date().toISOString() };
-  // RADICAL: Supabase direct (Vercel safe) au lieu de /api/products
-  let saved;
-  try {
-    const { data, error } = await supabase.from("products").upsert(payload).select().single();
-    if(error) throw error;
-    saved=data;
-  } catch(e) {
-    try {
-      const result=await apiRequest("/products",{method:"POST",body:JSON.stringify(payload)});
-      saved=result.product;
-    } catch(e2) { throw e; }
-  }
-  const idx=state.products.findIndex(x=>String(x.id)===String(saved.id));
-  if(idx>=0) state.products[idx]=saved; else state.products.unshift(saved);
-  showToast("Produit enregistré", "success");
-  return saved;
-}
-async function deleteProduct(id){
-  try {
-    const { error } = await supabase.from("products").delete().eq("id", id);
-    if(error) throw error;
-  } catch(e) {
-    try { await apiRequest(`/products/${encodeURIComponent(id)}`,{method:"DELETE"}); } catch(e2) { throw e; }
-  }
-  state.products=state.products.filter(x=>String(x.id)!==String(id));
-  showToast("Produit supprimé", "success");
-}
-
-// ===== MODALS =====
-function openPaymentModal({ target, productId="", amount=0, title="Paiement", adId="" }){
-  $("#payment-title").innerHTML = `<i class="fa-solid fa-lock" style="margin-right:8px"></i>${escapeHtml(title)}`;
-  $("#payment-target").value=target;
-  $("#payment-product-id").value=productId;
-  $("#payment-ad-id").value=adId;
-  $("#payment-amount").value=amount;
-  $("#transcash-amount").value=amount;
-  $("#payment-modal").classList.remove("hidden");
-}
-function closePaymentModal(){
-  $("#payment-modal").classList.add("hidden");
-  $("#payment-form").reset();
-  $("#card-fields").classList.add("hidden");
-  $("#transcash-fields").classList.remove("hidden");
-  $("#transcash-preview").classList.add("hidden");
-  $("#transcash-preview").innerHTML="";
-}
-function closeAdModal(){ $("#ad-modal").classList.add("hidden"); $("#ad-form").reset(); }
-
-// ===== HANDLERS =====
-async function handleLoginSubmit(e){
-  e.preventDefault();
-  const form=e.currentTarget, email=form.email.value.trim(), password=form.password.value;
-  if(!email||!password){ showToast("Remplis tous les champs", "error"); return; }
-  try{
-    const { error } = await supabase.auth.signInWithPassword({email,password});
-    if(error) throw error;
-    await hydrateState();
-    showToast("Connexion réussie", "success");
-    const role=getCurrentUser()?.role;
-    window.location.hash=role==="admin"?"#/admin":"#/";
-    render();
-  } catch(err){ showToast(err.message||"Connexion impossible", "error"); }
-}
-async function handleSignupSubmit(e){
-  e.preventDefault();
-  const form=e.currentTarget, fullName=form.fullName.value.trim(), username=form.username.value.trim(), email=form.email.value.trim(), password=form.password.value;
-  if(!fullName||!username||!email||!password){ showToast("Remplis tous les champs", "error"); return; }
-  if(password.length<6){ showToast("Mot de passe min 6 caractères", "error"); return; }
-  try{
-    const { data, error } = await supabase.auth.signUp({ email, password, options:{ data:{ full_name:fullName, username } } });
-    if(error) throw error;
-    if(data.session){
-      await hydrateState();
-      showToast("Compte créé avec succès", "success");
-      window.location.hash="#/";
-      render();
-    } else {
-      showToast("Compte créé ! Vérifie ton email", "success", 6000);
-      window.location.hash="#/login";
-      render();
-    }
-  } catch(err){ showToast(err.message||"Inscription impossible", "error"); }
-}
-async function handleAdminProductSubmit(e){
-  e.preventDefault();
-  const form=e.currentTarget, file=form.imageUpload.files[0];
-  let imageValue=form.image.value.trim();
-  try{
-    if(file){
-      const ext=(file.name.split(".").pop()||"jpg").toLowerCase(), path=`products/${crypto.randomUUID()}.${ext}`;
-      const { error } = await supabase.storage.from("product-images").upload(path,file,{upsert:false,contentType:file.type});
-      if(error) throw error;
-      imageValue=supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl;
-    }
-    const product={ id:form.id.value||undefined, nom:form.nom.value.trim(), age:Number(form.age.value), lieu:form.lieu.value.trim(), prix:Number(form.prix.value), image:imageValue };
-    if(!product.nom||product.age<18||!product.lieu||product.prix<=0||!product.image){ showToast("Remplis tous les champs + image", "error"); return; }
-    await saveProducts(product);
-    form.reset();
-    $("#product-id").value="";
-    render();
-  } catch(err){ showToast(err.message||"Erreur produit", "error"); }
-}
-async function handleAdSubmit(e){
-  e.preventDefault();
-  const form=e.currentTarget, user=getCurrentUser();
-  if(!user){ window.location.hash="#/login"; render(); return; }
-  const title=form.adTitle.value.trim(), text=form.adText.value.trim(), file=form.mediaUpload.files[0];
-  let mediaType=form.mediaType.value, mediaUrl=form.mediaUrl.value.trim();
-  try{
-    if(file){
-      mediaType=file.type.startsWith("video/")?"video":"image";
-      const path=`ads/${user.id}/${crypto.randomUUID()}.${(file.name.split(".").pop()||"bin").toLowerCase()}`;
-      const { error } = await supabase.storage.from("product-images").upload(path,file,{upsert:false,contentType:file.type});
-      if(error) throw error;
-      mediaUrl=supabase.storage.from("product-images").getPublicUrl(path).data.publicUrl;
-    }
-    if(!title||(!text&&!mediaUrl)){ showToast("Titre + contenu requis", "error"); return; }
-    // RADICAL: Supabase direct
-    const { data: adData, error: adError } = await supabase.from("ads").insert({ user_id: user.id, title, text, media_type: mediaType, media_url: mediaUrl, status: "pending" }).select().single();
-    if(adError) throw adError;
-    const adRes={ ad: adData };
-    closeAdModal();
-    openPaymentModal({ target:"ad", amount:CONFIG.FIXED_AD_PRICE, title:"Paiement annonce - 1$", adId:adRes.ad.id });
-    showToast("Annonce créée, paiement requis", "info");
-  } catch(err){ showToast(err.message||"Erreur annonce", "error"); }
-}
-async function handlePaymentSubmit(e){
-  e.preventDefault();
-  const user=getCurrentUser();
-  if(!user){ showToast("Connecte-toi d'abord", "error"); window.location.hash="#/login"; render(); return; }
-  const form=e.currentTarget, method=form.querySelector('input[name="method"]:checked')?.value||"transcash";
-  if(method!=="transcash"){ showToast("Carte bientôt dispo", "error"); return; }
-  const file=$("#transcash-proof").files[0];
-  if(!file){ showToast("Preuve requise", "error"); return; }
-  const amount=Number($("#payment-amount").value||0), target=$("#payment-target").value, productId=$("#payment-product-id").value||null, adId=$("#payment-ad-id").value||null;
-  try{
-    const path=`${user.id}/${crypto.randomUUID()}.${(file.name.split(".").pop()||"jpg").toLowerCase()}`;
-    const { error: upErr } = await supabase.storage.from("payment-proofs").upload(path,file,{upsert:false,contentType:file.type});
-    if(upErr) throw upErr;
-    // RADICAL: Supabase direct
-    {
-      const { error: payErr } = await supabase.from("payments").insert({ user_id: user.id, product_id: productId, ad_id: adId, target, amount, method, status: "pending", validation: "pending", proof_url: path });
-      if(payErr) throw payErr;
-    }
-    closePaymentModal();
-    setPaymentNotice("Votre paiement est en cours de vérification. Vous serez notifié après validation admin.");
-    showToast("Paiement enregistré, en attente validation", "success", 6000);
-    await hydrateState();
-    render();
-  } catch(err){ showToast(err.message||"Erreur paiement", "error"); }
-}
-
-// ===== GLOBAL CLICKS DYNAMIQUES =====
-function handleGlobalClick(e){
-  const buyBtn=e.target.closest('[data-action="buy"]');
-  if(buyBtn){
-    const product=state.products.find(x=>String(x.id)===String(buyBtn.dataset.id));
-    if(!product) return;
-    // animation click
-    buyBtn.innerHTML=`<i class="fa-solid fa-spinner fa-spin"></i>`;
-    setTimeout(()=>{
-      openPaymentModal({ target:"product", productId:product.id, amount:Number(product.prix||product.price||0), title:`Paiement pour ${product.nom||product.title||"Profil"} - ${formatPrice(product.prix||product.price)}` });
-    }, 300);
-    return;
-  }
-  const postBtn=e.target.closest("#post-ad-btn");
-  if(postBtn){
-    e.preventDefault();
-    const user=getCurrentUser();
-    if(!user){ window.location.hash="#/login"; render(); showToast("Connecte-toi pour poster", "info"); return; }
-    window.location.href="/post.html";
-  }
-  const searchToggle=e.target.closest("#search-toggle");
-  if(searchToggle){
-    $("#search-bar").classList.toggle("hidden");
-    if(!$("#search-bar").classList.contains("hidden")) $("#global-search").focus();
-  }
-  const closeSearch=e.target.closest("#close-search");
-  if(closeSearch){
-    $("#search-bar").classList.add("hidden");
+  }catch(err){
+    console.error("Checkout error", err);
+    toast("Erreur checkout: "+err.message,"error");
+    if(statusEl) statusEl.innerHTML=`<div style="background:rgba(255,0,0,0.1);padding:10px;border-radius:8px;color:var(--danger)">Erreur: ${esc(err.message)}<br><small>Vérifie: 1) Token live_... 2) Price ${PRICE_ID} existe en PRODUCTION Paddle 3) SUPABASE_SECRET_KEY configuré serveur</small><br><br><a href="https://buy.paddle.com/checkout?items[0][priceId]=${PRICE_ID}" target="_blank" class="btn-primary small">Paiement direct Paddle (fallback)</a></div>`;
   }
 }
 
-// ===== ADMIN HANDLERS =====
-function attachAdminHandlers(){
-  $("#admin-product-form")?.addEventListener("submit", handleAdminProductSubmit);
-  $("#redirect-settings-form")?.addEventListener("submit", async (e)=>{
-    e.preventDefault();
-    const value=$("#payment-success-link").value.trim();
-    if(!value){ showToast("Lien requis", "error"); return; }
-    try{
-      // RADICAL: Supabase direct
-      {
-        const { error: setErr } = await supabase.from("settings").upsert({ key: "payment_redirect_url", value, updated_at: new Date().toISOString() });
-        if(setErr) throw setErr;
-      }
-      setRedirectUrl(value);
-      showToast("Lien enregistré", "success");
-    } catch(err){ showToast(err.message, "error"); }
-  });
-  $("#reset-product-form")?.addEventListener("click", ()=>{
-    $("#admin-product-form")?.reset();
-    const id=$("#product-id");
-    if(id) id.value="";
-  });
-  $$('[data-action="edit-product"]').forEach(btn=>btn.addEventListener("click", ()=>{
-    const p=state.products.find(x=>String(x.id)===String(btn.dataset.id));
-    if(!p) return;
-    const form=$("#admin-product-form");
-    if(!form) return;
-    form.id.value=p.id;
-    form.nom.value=p.nom||"";
-    form.age.value=p.age||"";
-    form.lieu.value=p.lieu||"";
-    form.prix.value=p.prix||"";
-    form.image.value=p.image||"";
-    window.scrollTo({top:0,behavior:"smooth"});
-    showToast(`Modification de ${p.nom}`, "info");
-  }));
-  $$('[data-action="delete-product"]').forEach(btn=>btn.addEventListener("click", async ()=>{
-    if(!confirm("Supprimer ce produit ?")) return;
-    try{ await deleteProduct(btn.dataset.id); render(); }catch(e){ showToast(e.message, "error"); }
-  }));
-  $$('[data-action="accept-payment"]').forEach(btn=>btn.addEventListener("click", async ()=>{
-    try{
-      btn.innerHTML=`<i class="fa-solid fa-spinner fa-spin"></i>`;
-      // RADICAL: Supabase direct
-      {
-        const { data: payment, error: payUpErr } = await supabase.from("payments").update({ status: "accepted", validation: "valid", updated_at: new Date().toISOString() }).eq("id", btn.dataset.id).select().single();
-        if(payUpErr) throw payUpErr;
-        if(payment.target==="ad" && payment.ad_id) {
-          await supabase.from("ads").update({ status: "active", updated_at: new Date().toISOString() }).eq("id", payment.ad_id);
-        }
-      }
-      await hydrateState();
-      clearPaymentNotice();
-      showToast("Paiement accepté, redirection...", "success");
-      setTimeout(()=>{ window.location.href=getRedirectUrl(); }, 1000);
-    } catch(e){ showToast(e.message, "error"); }
-  }));
-  $$('[data-action="decline-payment"]').forEach(btn=>btn.addEventListener("click", async ()=>{
-    try{
-      {
-        const { data: payment, error: payUpErr } = await supabase.from("payments").update({ status: "declined", validation: "invalid", updated_at: new Date().toISOString() }).eq("id", btn.dataset.id).select().single();
-        if(payUpErr) throw payUpErr;
-        if(payment.target==="ad" && payment.ad_id) {
-          await supabase.from("ads").update({ status: "declined", updated_at: new Date().toISOString() }).eq("id", payment.ad_id);
-        }
-      }
-      await hydrateState();
-      showToast("Paiement décliné", "info");
-      render();
-    } catch(e){ showToast(e.message, "error"); }
-  }));
-  $$('[data-action="delete-ad"]').forEach(btn=>btn.addEventListener("click", async ()=>{
-    if(!confirm("Supprimer cette annonce ?")) return;
-    try{ const { error } = await supabase.from("ads").delete().eq("id", btn.dataset.id); if(error) throw error; await hydrateState(); showToast("Annonce supprimée", "success"); render(); }catch(e){ showToast(e.message, "error"); }
-  }));
-  $$('[data-action="view-proof"]').forEach(btn=>btn.addEventListener("click", async ()=>{
-    const path = btn.dataset.path;
-    const previewId = btn.nextElementSibling?.id;
-    const previewEl = previewId ? document.getElementById(previewId) : btn.nextElementSibling;
-    if(!path) return;
-    btn.innerHTML=`<i class="fa-solid fa-spinner fa-spin"></i> Chargement...`;
-    try {
-      const { data, error } = await supabase.storage.from("payment-proofs").createSignedUrl(path, 300);
-      if(error) throw error;
-      if(previewEl) {
-        previewEl.innerHTML=`<a href="${data.signedUrl}" target="_blank"><img src="${data.signedUrl}" alt="Preuve" class="payment-proof" style="width:100%;max-width:300px;border-radius:8px;margin-top:8px" /></a>`;
-      } else {
-        window.open(data.signedUrl, "_blank");
-      }
-      showToast("Preuve chargée", "success");
-    } catch(e) {
-      showToast("Erreur preuve: "+e.message, "error");
-    } finally {
-      btn.innerHTML=`<i class="fa-solid fa-eye"></i> Voir preuve`;
-    }
-  }));
-  $("#admin-logout-btn")?.addEventListener("click", logoutUser);
+async function handleClick(e){
+  const subBtn=e.target.closest('#subscribe-now-btn')||e.target.closest('#home-subscribe-btn'); if(subBtn){openCheckout(); return}
+  const manageBtn=e.target.closest('#manage-sub-btn'); if(manageBtn){
+    try{const {data:{session}}=await supabase.auth.getSession(); const res=await fetch('/api/paddle/manage',{headers:{Authorization:`Bearer ${session.access_token}`}}); const data=await res.json(); if(data.customerId){toast(`Customer ID: ${data.customerId} - Utilisez portail Paddle pour gérer`,"info"); window.open(`https://customer-portal.paddle.com/cpl_${data.customerId}`,"_blank");} else toast("Aucun abonnement trouvé","error");}catch(err){toast(err.message,"error")} return
+  }
+  const view=e.target.closest('[data-action="view-product"]'); if(view){location.hash=`#/product/${view.dataset.id}`; return}
+  const cmd=e.target.closest('[data-action="commander"]'); if(cmd){
+    const u=getUser(), p=state.products.find(x=>String(x.id)===String(cmd.dataset.id)); if(!p) return; setPending({productId:p.id,price:Number(p.prix),name:p.nom});
+    if(!u){toast("Connexion obligatoire","error"); location.hash="#/login"; return}
+    if(!state.isPremium && u.role!=="admin"){toast("🔒 Abonnement requis - 5,99€/mois","error"); location.hash=`#/payment/${p.id}`; return}
+    const tg=tgUrl(p); location.hash=`#/payment/${p.id}`; setTimeout(()=>window.open(tg,"_blank"),700); return
+  }
+  const r=e.target.closest('[data-action="recharge-for-product"]'); if(r){const p=state.products.find(x=>String(x.id)===String(r.dataset.id)); if(p) setPending({productId:p.id,price:Number(r.dataset.price),missing:Number(r.dataset.missing),name:p.nom}); location.hash="#/wallet"; return}
+  const pay=e.target.closest('[data-action="pay-product"]'); if(pay){
+    const u=getUser(); if(!u){location.hash="#/login"; return}
+    if(!state.isPremium && u.role!=="admin"){toast("🔒 Abonnement requis pour payer","error"); render(); return}
+    const price=Number(pay.dataset.price); if(Number(u.balance)<price){const miss=price-Number(u.balance); setPending({productId:pay.dataset.id,price,missing:miss,name:state.products.find(x=>String(x.id)===String(pay.dataset.id))?.nom||''}); location.hash="#/wallet"; return}
+    pay.disabled=true; try{const {data,error}=await supabase.rpc("pay_product",{p_product_id:pay.dataset.id}); if(error) throw error; const prod=state.products.find(x=>String(x.id)===String(pay.dataset.id)); const tg=tgUrl(prod); toast(`Paiement confirmé → Telegram`,"success"); const cur=getUser(); if(cur){cur.balance=data.new_balance||data.new; setUser(cur)} await hydrate(); setTimeout(()=>{window.open(tg,"_blank"); location.hash="#/orders"},900); render();}catch(err){toast(err.message,"error"); pay.disabled=false} return}
+  const sel=e.target.closest('[data-select-method]'); if(sel){setPM(sel.dataset.selectMethod); render(); return}
+  const cont=e.target.closest('[data-action="continue-to-payment"]'); if(cont){const a=document.getElementById("after-continue"); if(a) a.style.display="block"; cont.disabled=true; return}
+  const vo=e.target.closest('[data-action="view-order"]'); if(vo){location.hash=`#/order/${vo.dataset.id}`; return}
+  const vp=e.target.closest('[data-action="view-proof"]'); if(vp){try{const {data}=await supabase.storage.from("deposit-proofs").createSignedUrl(vp.dataset.path,600); const el=vp.nextElementSibling; if(el) el.innerHTML=`<a href="${data.signedUrl}" target="_blank"><img src="${data.signedUrl}" style="max-width:250px"/></a>`}catch{toast("Erreur preuve","error")} return}
+  const ap=e.target.closest('[data-action="approve-deposit"]'); if(ap){ap.disabled=true; try{const {error}=await supabase.rpc("approve_deposit",{request_id:ap.dataset.id}); if(error) throw error; toast("Approuvé 30+100=130","success"); await hydrate(); render()}catch(err){toast(err.message,"error"); ap.disabled=false} return}
+  const rj=e.target.closest('[data-action="reject-deposit"]'); if(rj){const rs=prompt("Motif","Preuve invalide"); if(!rs) return; try{const {error}=await supabase.rpc("reject_deposit",{request_id:rj.dataset.id,reason:rs.trim()}); if(error) throw error; toast("Refusé","info"); await hydrate(); render()}catch(err){toast(err.message,"error")} return}
+  const ed=e.target.closest('[data-action="edit-product"]'); if(ed){const p=state.products.find(x=>String(x.id)===String(ed.dataset.id)); if(!p) return; document.getElementById("product-id").value=p.id; document.getElementById("prod-nom").value=p.nom||""; document.getElementById("prod-prix").value=p.prix||""; document.getElementById("prod-telegram").value=p.telegram_username||p.telegram_link||""; return}
+  const del=e.target.closest('[data-action="delete-product"]'); if(del){if(!confirm("Supprimer?")) return; await supabase.from("products").delete().eq("id",del.dataset.id); await hydrate(); render(); return}
 }
 
-// ===== MODAL BINDINGS =====
-function bindModalControls(){
-  $("#close-payment-modal")?.addEventListener("click", closePaymentModal);
-  $("#close-ad-modal")?.addEventListener("click", closeAdModal);
-  $("#payment-modal")?.addEventListener("click", (e)=>{ if(e.target.id==="payment-modal") closePaymentModal(); });
-  $("#ad-modal")?.addEventListener("click", (e)=>{ if(e.target.id==="ad-modal") closeAdModal(); });
-  $("#payment-form")?.addEventListener("submit", async (e)=>{
-    const target=$("#payment-target").value;
-    if(target==="ad"){
-      e.preventDefault();
-      const file=$("#transcash-proof").files[0], user=getCurrentUser();
-      if(!file||!user){ showToast("Preuve + connexion requises", "error"); return; }
-      try{
-        const path=`${user.id}/${crypto.randomUUID()}.${(file.name.split(".").pop()||"jpg").toLowerCase()}`;
-        const { error } = await supabase.storage.from("payment-proofs").upload(path,file,{upsert:false,contentType:file.type});
-        if(error) throw error;
-        {
-          const { error: payErr } = await supabase.from("payments").insert({ user_id: user.id, ad_id: $("#payment-ad-id").value||null, target: "ad", amount: Number($("#payment-amount").value||0), method: "transcash", status: "pending", validation: "pending", proof_url: path });
-          if(payErr) throw payErr;
-        }
-        closePaymentModal();
-        setPaymentNotice("Paiement annonce en vérification.");
-        showToast("Paiement enregistré", "success");
-        await hydrateState();
-        render();
-      } catch(err){ showToast(err.message, "error"); }
-      return;
-    }
-    await handlePaymentSubmit(e);
-  });
-  $("#ad-form")?.addEventListener("submit", handleAdSubmit);
-  $$('input[name="method"]').forEach(input=>input.addEventListener("change", ()=>{
-    const isCard=input.value==="card";
-    $("#transcash-fields").classList.toggle("hidden", isCard);
-    $("#card-fields").classList.toggle("hidden", !isCard);
-  }));
-  $("#transcash-proof")?.addEventListener("change", async function(){
-    const file=this.files[0], preview=$("#transcash-preview");
-    if(!file){ preview.classList.add("hidden"); return; }
-    try{
-      const data=await readFileAsDataUrl(file);
-      preview.innerHTML=`<img src="${data}" alt="Preuve" />`;
-      preview.classList.remove("hidden");
-    } catch { showToast("Fichier illisible", "error"); }
-  });
-
-  // Search
-  $("#global-search")?.addEventListener("input", (e)=>{
-    state.searchQuery=e.target.value;
-    if(window.location.hash.includes("products") || window.location.hash==="#/" || window.location.hash===""){
-      render();
-      initDynamicEffects();
-    }
-  });
-  $("#catalog-search")?.addEventListener("input", (e)=>{
-    state.searchQuery=e.target.value;
-    render();
-    initDynamicEffects();
-    const input = $("#catalog-search");
-    if(input){
-      input.focus();
-      const val=input.value;
-      input.value="";
-      input.value=val;
-    }
-  });
-  $("#clear-filter")?.addEventListener("click", ()=>{
-    state.searchQuery="";
-    const gs=$("#global-search");
-    if(gs) gs.value="";
-    render();
-    initDynamicEffects();
-    showToast("Filtres effacés", "info");
+function bind(){
+  document.addEventListener("submit", async e=>{
+    if(e.target.id==="login-form"){e.preventDefault(); try{const {error}=await supabase.auth.signInWithPassword({email:e.target.email.value.trim(),password:e.target.password.value}); if(error) throw error; await hydrate(); const pend=getPending(); if(pend&&pend.productId){location.hash=`#/payment/${pend.productId}`;} else {location.hash=getUser()?.role==="admin"?"#/admin":"#/";} render();}catch(err){toast(err.message,"error")}}
+    if(e.target.id==="signup-form"){e.preventDefault(); try{const {error}=await supabase.auth.signUp({email:e.target.email.value.trim(),password:e.target.password.value}); if(error) throw error; const {error:le}=await supabase.auth.signInWithPassword({email:e.target.email.value.trim(),password:e.target.password.value}); if(le) throw le; await hydrate(); const pend=getPending(); if(pend) location.hash=`#/payment/${pend.productId}`; else location.hash="#/"; render();}catch(err){toast(err.message,"error")}}
+    if(e.target.id==="wallet-recharge-form"){e.preventDefault(); const u=getUser(); if(!state.isPremium && u.role!=="admin"){toast("🔒 Abonnement requis","error"); return} const amount=Number(document.getElementById("wallet-amount").value||0); const ref=document.getElementById("wallet-ref").value.trim()||`REF-${Date.now()}`; const hash=document.getElementById("wallet-crypto-hash")?.value.trim()||null; const file=document.getElementById("wallet-proof").files[0]; const mid=getPM(); const m=state.paymentMethods.find(x=>String(x.id)===String(mid)); if(!m||!amount||!file){toast("Champs requis","error");return} const btn=e.target.querySelector('button'); btn.disabled=true; try{const path=`${u.id}/${crypto.randomUUID()}.${file.name.split(".").pop()}`; const {error:up}=await supabase.storage.from("deposit-proofs").upload(path,file); if(up) throw up; const payload={user_id:u.id,amount,currency:"EUR",payment_method:m.name,payment_method_id:mid,transaction_reference:ref,crypto_tx_hash:hash,proof_path:path,proof_url:path,status:"pending"}; const {error:ins}=await supabase.from("deposit_requests").insert(payload); if(ins) throw ins; toast("En attente validation admin","success"); await hydrate(); render();}catch(err){toast(err.message,"error")} finally{btn.disabled=false}}
+    if(e.target.id==="admin-product-form"){e.preventDefault(); const id=document.getElementById("product-id").value||null; const tel=document.getElementById("prod-telegram").value.trim(); let tl=null, tu=null; if(tel){if(tel.startsWith("http")) tl=tel; else tu=tel;} const payload={nom:document.getElementById("prod-nom").value.trim(),prix:Number(document.getElementById("prod-prix").value),telegram_link:tl,telegram_username:tu}; try{if(id){await supabase.from("products").update(payload).eq("id",id)} else {await supabase.from("products").insert({...payload, age:23, lieu:"Cotonou", image:"https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400"})} e.target.reset(); document.getElementById("product-id").value=""; await hydrate(); render(); toast("Produit + Telegram","success")}catch(err){toast(err.message,"error")}}
   });
 }
-
-// ===== LOGOUT =====
-async function logoutUser(){
-  await supabase.auth.signOut();
-  setCurrentUser(null);
-  state.payments=[];
-  showToast("Déconnexion réussie", "info");
-  window.location.hash="#/";
-  render();
-}
-
-// ===== RENDER CORE DYNAMIQUE =====
 async function render(){
-  const app=$("#app");
-  const hash=window.location.hash||"#/";
-  const route=hash.replace("#","").split("/").filter(Boolean)[0]||"home";
-
-  let html="";
-  if(route==="login") html=renderLoginPage();
-  else if(route==="signup") html=renderSignupPage();
-  else if(route==="admin"){
-    const cur=getCurrentUser();
-    if(!cur||cur.role!=="admin"){ window.location.hash="#/login"; render(); return; }
-    html=renderAdminPage();
-  }
-  else if(route==="products") html=renderProductsPage();
-  else if(route==="discussion") html=renderDiscussionPage();
-  else if(route==="home"||route==="") html=renderHome();
-  else html=renderNotFound();
-
-  // Transition dynamique
-  app.style.opacity="0";
-  app.style.transform="translateY(10px)";
-  app.style.transition="opacity .3s ease, transform .3s ease";
-  
-  setTimeout(()=>{
-    app.innerHTML=html;
-    app.style.opacity="1";
-    app.style.transform="translateY(0)";
-
-    if(route==="login") $("#login-form")?.addEventListener("submit", handleLoginSubmit);
-    if(route==="signup") $("#signup-form")?.addEventListener("submit", handleSignupSubmit);
-    if(route==="admin") attachAdminHandlers();
-    if(route==="products"){
-      $("#catalog-search")?.addEventListener("input", (e)=>{
-        state.searchQuery=e.target.value;
-        const grid = app.querySelector(".product-grid");
-        if(grid){
-          const filtered = state.products.filter(p=> `${p.nom} ${p.lieu} ${p.age} ${p.prix}`.toLowerCase().includes(state.searchQuery.toLowerCase()));
-          grid.innerHTML = filtered.length ? filtered.map(renderProductCard).join("") : `<p class="empty-state"><i class="fa-solid fa-face-frown"></i> Aucun résultat</p>`;
-          initDynamicEffects();
-        }
-      });
-      $("#clear-filter")?.addEventListener("click", ()=>{
-        state.searchQuery="";
-        render();
-      });
-    }
-
-    renderBanner();
-    renderNotice();
-    startHeroSlideshow();
-    initDynamicEffects();
-
-    const user=getCurrentUser();
-    const loginLink=$("#login-link");
-    const signupLink=$("#signup-link");
-    const logoutBtn=$("#logout-btn");
-    let adminLink=$("#admin-link");
-
-    if(user?.role==="admin"){
-      if(!adminLink){
-        adminLink=document.createElement("a");
-        adminLink.id="admin-link";
-        adminLink.href="#/admin";
-        adminLink.className="nav-link";
-        adminLink.innerHTML=`<i class="fa-solid fa-shield-halved"></i> Admin`;
-        adminLink.style.color="var(--accent)";
-        adminLink.style.fontWeight="800";
-        $(".header-actions")?.appendChild(adminLink);
-      }
-      loginLink?.classList.add("hidden");
-      signupLink?.classList.add("hidden");
-      logoutBtn?.classList.remove("hidden");
-    } else if(user){
-      if(adminLink) adminLink.remove();
-      loginLink?.classList.add("hidden");
-      signupLink?.classList.add("hidden");
-      logoutBtn?.classList.remove("hidden");
-    } else {
-      if(adminLink) adminLink.remove();
-      loginLink?.classList.remove("hidden");
-      signupLink?.classList.remove("hidden");
-      logoutBtn?.classList.add("hidden");
-    }
-
-    $$(".main-nav a").forEach(a=>{
-      const isActive=(route==="home"&&a.dataset.nav==="home")||a.dataset.nav===route;
-      a.classList.toggle("active", isActive);
-    });
-
-  }, 150);
+  const app=$("#app"); const hash=location.hash||"#/"; const parts=hash.replace("#","").split("/").filter(Boolean); const q=new URLSearchParams(hash.split("?")[1]||""); let route=parts[0]||"home", qProd=q.get("product"); if(route==="payment"&&parts[1]) qProd=parts[1]; if(hash.includes("product=")) qProd=hash.split("product=")[1]?.split("&")[0], route="payment";
+  let html=""; if(route==="login") html=loginPage(); else if(route==="signup") html=signupPage(); else if(route==="wallet") html=walletPage(); else if(route==="products") html=productsPage(); else if(route==="product"&&parts[1]) html=productPage(parts[1]); else if(route==="payment"&&qProd) html=paymentPage(qProd); else if(route==="orders") html=ordersPage(); else if(route==="order"&&parts[1]) html=orderDetail(parts[1]); else if(route==="admin") html=adminPage(); else html=home();
+  app.innerHTML=html;
+  const u=getUser(), login=$("#login-link"), signup=$("#signup-link"), logout=$("#logout-btn"); let w=$("#wallet-link"), a=$("#admin-link"), o=$("#orders-link");
+  if(u){if(!w){w=document.createElement("a"); w.id="wallet-link"; w.href="#/wallet"; w.className="nav-link"; w.style.background="rgba(255,138,0,0.12)"; w.style.padding="6px 10px"; w.style.borderRadius="20px"; document.querySelector(".header-actions")?.prepend(w)} w.innerHTML=`${Number(u.balance||0).toFixed(0)}€ ${state.isPremium?'<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:10px;font-size:0.6rem">Abonné</span>':''}`; if(!o){o=document.createElement("a"); o.id="orders-link"; o.href="#/orders"; o.className="nav-link"; o.innerHTML="Mes commandes"; document.querySelector(".header-actions")?.prepend(o)} if(u.role==="admin"){if(!a){a=document.createElement("a"); a.id="admin-link"; a.href="#/admin"; a.className="nav-link"; a.innerHTML="Dashboard"; document.querySelector(".header-actions")?.appendChild(a)} login?.classList.add("hidden"); signup?.classList.add("hidden"); logout?.classList.remove("hidden")} else {a?.remove(); login?.classList.add("hidden"); signup?.classList.add("hidden"); logout?.classList.remove("hidden")}} else {w?.remove(); a?.remove(); o?.remove(); login?.classList.remove("hidden"); signup?.classList.remove("hidden"); logout?.classList.add("hidden")}
 }
-
-// ===== INIT DYNAMIQUE =====
-$("#logout-btn")?.addEventListener("click", logoutUser);
-document.body.addEventListener("click", handleGlobalClick);
-bindModalControls();
-window.addEventListener("hashchange", ()=> render());
-
-supabase.auth.onAuthStateChange(()=>{
-  setTimeout(async()=>{ await hydrateState(); render(); },0);
-});
-
-console.log("%cEscortHub v2 - Font Awesome Pro - Dynamique", "color:#ff8a00;font-size:16px;font-weight:900");
-console.log("%cSince 2013 - Worldwide", "color:#9a9a9a");
-
-hydrateState().then(()=>{
-  render();
-  setTimeout(hidePageLoader, 800);
-  showToast(`Bienvenue sur EscortHub • ${state.products.length} profils disponibles`, "info", 5000);
-}).catch(err=>{
-  console.error("Init error:",err);
-  render();
-  hidePageLoader();
-  showToast("Erreur de chargement, réessayez", "error");
-});
-
-window._escorthub = { supabase, state, CONFIG, showToast };
+document.getElementById("logout-btn")?.addEventListener("click", async()=>{await supabase.auth.signOut(); setUser(null); setPending(null); setPM(null); location.hash="#/"; render()});
+document.body.addEventListener("click", handleClick);
+bind();
+window.addEventListener("hashchange", render);
+hydrate().then(()=>{render(); document.getElementById("page-loader")?.classList.add("hidden")});
