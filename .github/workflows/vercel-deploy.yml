@@ -1,0 +1,13 @@
+name: Deploy to Vercel via GitHub
+on:
+  push:
+    branches: [main]
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy info
+        run: |
+          echo "Code pushed to main - Vercel will auto-deploy if connected"
+          echo "Repo: IsholaRsk/Action-verit-"
