@@ -1,3 +1,4 @@
+global.WebSocket = require('ws');
 const crypto = require('crypto');
 const { createClient } = require('@supabase/supabase-js');
 
