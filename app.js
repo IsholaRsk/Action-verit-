@@ -51,7 +51,10 @@ function subscriptionRequiredScreen(autoOpen=false){
 function subscribePage(){
   const u=getUser();
   if(!u) return `<section class="page-shell centered"><h1>Connexion requise</h1><p>Créez un compte pour vous abonner</p><a href="#/signup" class="btn-primary">S'inscrire → Paiement 5,99€</a></section>`;
-  if(state.isPremium && u.role!=="admin") return `<section class="page-shell centered" style="text-align:center;padding:60px 20px"><div style="background:var(--panel);border:2px solid var(--success);border-radius:20px;padding:32px"><h1 style="color:var(--success)"><i class="fa-solid fa-crown"></i> Déjà Abonné !</h1><p>Votre abonnement premium est actif</p><a href="#/" class="btn-primary">Catalogue</a></div></section>`;
+  if(u.role==="admin"){
+    return `<section class="page-shell centered" style="text-align:center;padding:60px 20px"><div style="background:var(--panel);border:2px solid var(--success);border-radius:20px;padding:32px"><h1 style="color:var(--success)">👑 Admin - Accès gratuit</h1><p>Pas de paiement requis pour admin - Accès complet catalogue</p><a href="#/" class="btn-primary">Catalogue</a> <a href="#/admin" class="btn-secondary">Dashboard</a></div></section>`;
+  }
+  if(state.isPremium) return `<section class="page-shell centered" style="text-align:center;padding:60px 20px"><div style="background:var(--panel);border:2px solid var(--success);border-radius:20px;padding:32px"><h1 style="color:var(--success)"><i class="fa-solid fa-crown"></i> Déjà Abonné !</h1><p>Votre abonnement premium est actif</p><a href="#/" class="btn-primary">Catalogue</a></div></section>`;
   return subscriptionRequiredScreen(true);
 }
 
@@ -122,14 +125,32 @@ function productPage(id){
 }
 function paymentPage(pid){
   const p=state.products.find(x=>String(x.id)===String(pid)); if(!p) return `<h1>Produit introuvable</h1>`; const u=getUser(); if(!u){setPending({productId:p.id,price:Number(p.prix),name:p.nom}); return `<section class="page-shell centered"><h1>Connexion requise</h1><p>Connectez-vous pour commander ${esc(p.nom)}</p><a href="#/login" class="btn-primary">Connexion</a></section>`}
-  if(!state.isPremium && u.role!=="admin"){ return subscriptionRequiredScreen(); }
+  // ADMIN = accès gratuit direct, pas de paiement du tout
+  if(u.role==="admin"){
+    const lieu = p.lieu || 'Europe';
+    const tgLink = tgUrl(p);
+    return `<section class="page-shell" style="max-width:600px;margin:0 auto">
+      <div style="background:var(--panel);border:2px solid var(--success);border-radius:16px;padding:24px">
+        <div style="text-align:center;margin-bottom:16px"><div style="font-size:2rem">👑</div><h1 style="color:var(--success)">Admin - Accès gratuit</h1><p>Pas de paiement requis pour admin</p></div>
+        <div style="background:var(--panel-soft);padding:14px;border-radius:10px;margin-bottom:14px">
+          <div><strong>Profil:</strong> ${esc(p.nom)} - ${p.age||'?'} ans - ${esc(lieu)} - ${euro(p.prix)}</div>
+        </div>
+        <a href="${esc(tgLink)}" target="_blank" class="btn-primary full" style="background:#229ED9;padding:14px"><i class="fa-brands fa-telegram"></i> CONTACTER ${esc(p.nom).toUpperCase()} DIRECT - ADMIN GRATUIT</a>
+        <div style="margin-top:12px;display:grid;gap:8px">
+          <a href="#/admin" class="btn-secondary full">Retour Dashboard</a>
+          <a href="#/" class="btn-secondary full">Catalogue</a>
+        </div>
+      </div>
+    </section>`;
+  }
+  if(!state.isPremium){ return subscriptionRequiredScreen(); }
   const bal=Number(u.balance||0), price=Number(p.prix||0), miss=Math.max(0,price-bal), can=bal>=price;
   return `<section class="page-shell"><h1>Paiement ${esc(p.nom)} ${state.isPremium?'<span style="background:var(--success);color:#fff;padding:4px 10px;border-radius:20px;font-size:0.7rem"><i class="fa-solid fa-crown"></i> Abonné</span>':''}</h1><p>Produit: ${esc(p.nom)} Prix: ${euro(price)} Solde: ${euro(bal)}</p>
   ${can?`<button class="btn-primary full" data-action="pay-product" data-id="${esc(p.id)}" data-price="${price}">PAYER ${price.toFixed(0)}€ → Telegram</button>`:`<div style="background:rgba(255,0,0,0.1);padding:10px;border-radius:8px">Solde insuffisant - Manque ${euro(miss)}</div><button class="btn-primary full" data-action="recharge-for-product" data-id="${esc(p.id)}" data-missing="${miss}" data-price="${price}">RECHARGER</button>`}
   <p><small>Après paiement → Telegram ${tgUrl(p)}</small></p></section>`;
 }
 function ordersPage(){
-  const u=getUser(); if(!u){location.hash="#/login";return""} if(!state.isPremium && u.role!=="admin") return subscriptionRequiredScreen();
+  const u=getUser(); if(!u){location.hash="#/login";return""} if(!state.isPremium && u.role!=="admin") return subscriptionRequiredScreen(); // admin bypass
   const orders=(state.transactions||[]).filter(t=>String(t.user_id)===String(u.id)&&t.type==='purchase'); 
   return `<section class="page-shell"><h1>Mes commandes (${orders.length}) - Liens après confirmation</h1>
     <p style="color:var(--muted)">Chaque commande confirmée affiche le lien Telegram direct du profil</p>
@@ -192,7 +213,11 @@ function home(){const u=getUser(); const isSub=state.isPremium; return `<section
 function loginPage(){const pend=getPending(); return `<section class="auth-page"><div class="auth-card"><h1>CONNEXION</h1>${pend?`<p>Produit: ${esc(pend.name)}</p>`:''}<form id="login-form"><label>Email<input type="email" name="email" required></label><label>Mot de passe<input type="password" name="password" required></label><button class="btn-primary full">Connexion</button><p style="margin-top:12px;font-size:0.85rem;text-align:center">Pas de compte ? <a href="#/signup">S'inscrire → Paiement 5,99€</a></p></form></div></section>`}
 function signupPage(){return `<section class="auth-page"><div class="auth-card" style="max-width:480px"><h1>Inscription - Étape 1/2</h1><div style="background:rgba(255,138,0,0.12);border:1px solid rgba(255,138,0,0.3);padding:12px;border-radius:10px;margin-bottom:14px"><div style="font-weight:800;margin-bottom:6px"><i class="fa-solid fa-credit-card" style="color:var(--accent)"></i> Paiement direct après inscription</div><div style="font-size:0.9rem;color:var(--muted)">Après création de compte, vous serez redirigé automatiquement vers la page de paiement sécurisé <strong style="color:var(--accent)">5,99€/mois</strong> pour activer votre accès premium immédiatement.</div></div><form id="signup-form"><label>Nom complet<input name="fullName" required placeholder="Votre nom"></label><label>Email<input type="email" name="email" required placeholder="email@exemple.com"></label><label>Mot de passe<input type="password" name="password" required placeholder="Min 6 caractères"></label><button class="btn-primary full" style="padding:14px;font-size:1.1rem;font-weight:800"><i class="fa-solid fa-arrow-right"></i> Créer mon compte → Payer 5,99€</button></form><p style="font-size:0.8rem;color:var(--muted);margin-top:12px;text-align:center"><i class="fa-solid fa-lock"></i> Paiement sécurisé Paddle - Carte, PayPal, Apple Pay<br>Accès immédiat après paiement - Résiliable à tout moment</p></div></section>`}
 function walletPage(){
-  const u=getUser(); if(!u){location.hash="#/login";return""} if(!state.isPremium && u.role!=="admin") return subscriptionRequiredScreen();
+  const u=getUser(); if(!u){location.hash="#/login";return""} 
+  if(u.role==="admin"){
+    return `<section class="page-shell centered" style="text-align:center;padding:40px 20px"><div style="background:var(--panel);border:2px solid var(--success);border-radius:16px;padding:24px"><h1>👑 Admin - Pas de paiement</h1><p>Admin n'a pas besoin de recharger - accès gratuit</p><a href="#/" class="btn-primary">Catalogue</a></div></section>`;
+  }
+  if(!state.isPremium) return subscriptionRequiredScreen(); // admin bypass
   const bal=u.balance||0, methods=state.paymentMethods||[], pend=getPending(); let miss=0, pendProd=null; if(pend){pendProd=state.products.find(p=>String(p.id)===String(pend.productId)); if(pendProd) miss=Math.max(0,Number(pendProd.prix)-bal)} const selId=getPM(), sel=selId?methods.find(m=>String(m.id)===String(selId)):null;
   return `<section class="page-shell"><h1>Recharger Solde ${euro(bal)}</h1><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div><h3>Moyens</h3>${methods.map(m=>`<button class="btn-secondary" data-select-method="${esc(m.id)}" style="width:100%;text-align:left;margin-bottom:6px">${esc(m.name)}</button>`).join("")}</div><div>${!sel?`<p>Choisissez moyen</p>`:`<h3>${esc(sel.name)}</h3><button class="btn-primary full" data-action="continue-to-payment">CONTINUER</button><div id="after-continue" style="display:none;margin-top:10px"><form id="wallet-recharge-form" style="display:grid;gap:6px"><label>Montant<input type="number" id="wallet-amount" value="${miss.toFixed(0)}" required></label><label>Réf<input type="text" id="wallet-ref"></label><label>Preuve<input type="file" id="wallet-proof" accept="image/*" required></label><button class="btn-primary">ENVOYER</button></form></div>`}</div></div></section>`;
 }
