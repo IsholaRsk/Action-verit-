@@ -55,9 +55,72 @@ function subscribePage(){
   return subscriptionRequiredScreen(true);
 }
 
-function productsPage(){return `<section class="section"><h2>Catalogue complet ${state.isPremium?'<span style="background:var(--success);color:#fff;padding:4px 10px;border-radius:20px;font-size:0.7rem">Abonné</span>':''}</h2><div class="product-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:16px">${state.products.map(card).join("")||"<p>Aucun produit</p>"}</div></section>`}
-function card(p){return `<div style="border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--panel)"><div style="background-image:url('${esc(p.image||'')}');height:160px;background-size:cover;background-position:center"></div><div style="padding:10px"><h3>${esc(p.nom)} ${euro(p.prix)}</h3><button class="btn-primary small" data-action="commander" data-id="${esc(p.id)}">COMMANDER</button> <button class="btn-secondary small" data-action="view-product" data-id="${esc(p.id)}">Voir</button></div></div>`}
-function productPage(id){const p=state.products.find(x=>String(x.id)===String(id)); if(!p) return `<h1>Produit introuvable</h1>`; return `<section class="page-shell"><a href="#/products" class="btn-secondary">Retour</a><h1>${esc(p.nom)} - ${euro(p.prix)}</h1><img src="${esc(p.image||'')}" style="width:100%;max-width:400px;height:300px;object-fit:cover;border-radius:10px"/><p>Prix: ${euro(p.prix)} - Telegram: ${esc(p.telegram_username||p.telegram_link||'config admin')}</p><button class="btn-primary full" data-action="commander" data-id="${esc(p.id)}">COMMANDER → Paiement → Telegram</button></section>`}
+function productsPage(){return `<section class="section"><h2>Catalogue Europe - 50 Profils ${state.isPremium?'<span style="background:var(--success);color:#fff;padding:4px 10px;border-radius:20px;font-size:0.7rem">Abonné</span>':''}</h2><div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"><span style="background:var(--panel);padding:4px 10px;border-radius:20px;font-size:0.8rem">🇫🇷 France</span><span style="background:var(--panel);padding:4px 10px;border-radius:20px;font-size:0.8rem">🇩🇪 Allemagne</span><span style="background:var(--panel);padding:4px 10px;border-radius:20px;font-size:0.8rem">🇪🇸 Espagne</span><span style="background:var(--panel);padding:4px 10px;border-radius:20px;font-size:0.8rem">🇮🇹 Italie</span><span style="background:var(--panel);padding:4px 10px;border-radius:20px;font-size:0.8rem">🇬🇧 UK</span><span style="background:var(--panel);padding:4px 10px;border-radius:20px;font-size:0.8rem">🇨🇭 Suisse</span><span style="background:var(--panel);padding:4px 10px;border-radius:20px;font-size:0.8rem">🇪🇺 Toute Europe</span></div><div class="product-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px;margin-top:16px">${state.products.map(card).join("")||"<p>Aucun produit</p>"}</div></section>`}
+function card(p){
+  const age = p.age ? `${p.age} ans` : '';
+  const lieu = p.lieu || 'Europe';
+  const ville = lieu.split(',')[0]?.trim() || lieu;
+  const pays = lieu.split(',')[1]?.trim() || 'Europe';
+  const tg = p.telegram_username || p.telegram_link || '@Polarish87';
+  return `<div style="border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel);transition:transform 0.2s" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+    <div style="position:relative">
+      <div style="background-image:url('${esc(p.image||'')}');height:200px;background-size:cover;background-position:center"></div>
+      <div style="position:absolute;top:8px;left:8px;background:rgba(0,0,0,0.7);color:#fff;padding:4px 8px;border-radius:20px;font-size:0.75rem"><i class="fa-solid fa-location-dot"></i> ${esc(ville)}</div>
+      <div style="position:absolute;top:8px;right:8px;background:var(--success);color:#fff;padding:4px 8px;border-radius:20px;font-size:0.75rem;font-weight:700">${euro(p.prix)}</div>
+      <div style="position:absolute;bottom:8px;left:8px;background:rgba(0,0,0,0.7);color:#fff;padding:3px 8px;border-radius:20px;font-size:0.7rem">${esc(pays)}</div>
+    </div>
+    <div style="padding:12px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <h3 style="margin:0;font-size:1.1rem">${esc(p.nom)}</h3>
+        <span style="background:var(--panel-soft);padding:2px 8px;border-radius:10px;font-size:0.8rem"><i class="fa-solid fa-cake-candles"></i> ${esc(age)}</span>
+      </div>
+      <div style="font-size:0.85rem;color:var(--muted);margin-bottom:8px;display:flex;gap:8px;flex-wrap:wrap">
+        <span><i class="fa-solid fa-map-pin"></i> ${esc(lieu)}</span>
+        <span><i class="fa-solid fa-user"></i> ${esc(age)}</span>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <button class="btn-primary small" data-action="commander" data-id="${esc(p.id)}" style="padding:8px"><i class="fa-solid fa-bolt"></i> COMMANDER</button>
+        <button class="btn-secondary small" data-action="view-product" data-id="${esc(p.id)}" style="padding:8px"><i class="fa-solid fa-eye"></i> Voir profil</button>
+      </div>
+      <div style="margin-top:8px;font-size:0.7rem;color:var(--muted);text-align:center"><i class="fa-brands fa-telegram" style="color:#229ED9"></i> Telegram: ${esc(tg)} (après confirmation)</div>
+    </div>
+  </div>`;
+}
+function productPage(id){
+  const p=state.products.find(x=>String(x.id)===String(id)); if(!p) return `<h1>Profil introuvable</h1>`;
+  const lieu = p.lieu || 'Europe';
+  const ville = lieu.split(',')[0]?.trim() || lieu;
+  const pays = lieu.split(',')[1]?.trim() || 'Europe';
+  const tg = p.telegram_username || p.telegram_link || '@Polarish87';
+  const tgLink = tgUrl(p);
+  return `<section class="page-shell" style="max-width:800px;margin:0 auto">
+    <a href="#/products" class="btn-secondary"><i class="fa-solid fa-arrow-left"></i> Retour catalogue</a>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:16px;background:var(--panel);border-radius:16px;overflow:hidden;border:1px solid var(--line)">
+      <div style="position:relative">
+        <img src="${esc(p.image||'')}" style="width:100%;height:500px;object-fit:cover"/>
+        <div style="position:absolute;top:12px;left:12px;background:rgba(0,0,0,0.8);color:#fff;padding:6px 12px;border-radius:20px"><i class="fa-solid fa-location-dot"></i> ${esc(ville)} - ${esc(pays)}</div>
+        <div style="position:absolute;top:12px;right:12px;background:var(--accent);color:#fff;padding:6px 12px;border-radius:20px;font-weight:800">${euro(p.prix)}</div>
+      </div>
+      <div style="padding:20px">
+        <h1 style="margin:0 0 8px">${esc(p.nom)} <span style="font-size:0.6em;background:var(--panel-soft);padding:4px 10px;border-radius:20px">${p.age||''} ans</span></h1>
+        <div style="display:grid;gap:10px;margin:16px 0">
+          <div style="display:flex;align-items:center;gap:8px"><i class="fa-solid fa-map-pin" style="color:var(--accent);width:20px"></i><span><strong>Ville:</strong> ${esc(ville)}</span></div>
+          <div style="display:flex;align-items:center;gap:8px"><i class="fa-solid fa-flag" style="color:var(--accent);width:20px"></i><span><strong>Pays:</strong> ${esc(pays)}</span></div>
+          <div style="display:flex;align-items:center;gap:8px"><i class="fa-solid fa-cake-candles" style="color:var(--accent);width:20px"></i><span><strong>Âge:</strong> ${p.age||'?'} ans</span></div>
+          <div style="display:flex;align-items:center;gap:8px"><i class="fa-solid fa-euro-sign" style="color:var(--accent);width:20px"></i><span><strong>Prix:</strong> ${euro(p.prix)}</span></div>
+          <div style="display:flex;align-items:center;gap:8px"><i class="fa-solid fa-location-dot" style="color:var(--accent);width:20px"></i><span><strong>Lieu complet:</strong> ${esc(lieu)}</span></div>
+        </div>
+        <div style="background:var(--panel-soft);border-radius:12px;padding:14px;margin:16px 0;border:1px solid var(--line)">
+          <div style="font-weight:700;margin-bottom:6px"><i class="fa-brands fa-telegram" style="color:#229ED9"></i> Contact Telegram</div>
+          <div style="font-size:0.9rem;color:var(--muted)">Lien Telegram: <code>${esc(tg)}</code><br><small>Le lien direct sera affiché après confirmation de paiement</small></div>
+          <a href="${esc(tgLink)}" target="_blank" style="display:inline-block;margin-top:8px;background:#229ED9;color:#fff;padding:6px 12px;border-radius:20px;font-size:0.8rem;text-decoration:none"><i class="fa-brands fa-telegram"></i> Voir Telegram (après paiement)</a>
+        </div>
+        <button class="btn-primary full" data-action="commander" data-id="${esc(p.id)}" style="padding:16px;font-size:1.1rem;font-weight:800"><i class="fa-solid fa-bolt"></i> COMMANDER ${esc(p.nom)} → ${euro(p.prix)} → Telegram après confirmation</button>
+        <p style="font-size:0.8rem;color:var(--muted);margin-top:10px;text-align:center">Après paiement, vous serez redirigé vers Telegram + lien affiché dans Mes commandes</p>
+      </div>
+    </div>
+  </section>`;
+}
 function paymentPage(pid){
   const p=state.products.find(x=>String(x.id)===String(pid)); if(!p) return `<h1>Produit introuvable</h1>`; const u=getUser(); if(!u){setPending({productId:p.id,price:Number(p.prix),name:p.nom}); return `<section class="page-shell centered"><h1>Connexion requise</h1><p>Connectez-vous pour commander ${esc(p.nom)}</p><a href="#/login" class="btn-primary">Connexion</a></section>`}
   if(!state.isPremium && u.role!=="admin"){ return subscriptionRequiredScreen(); }
@@ -68,9 +131,64 @@ function paymentPage(pid){
 }
 function ordersPage(){
   const u=getUser(); if(!u){location.hash="#/login";return""} if(!state.isPremium && u.role!=="admin") return subscriptionRequiredScreen();
-  const orders=(state.transactions||[]).filter(t=>String(t.user_id)===String(u.id)&&t.type==='purchase'); return `<section class="page-shell"><h1>Mes commandes (${orders.length})</h1>${orders.map(o=>{const prod=state.products.find(p=>String(p.id)===String(o.product_id)); return `<div style="border:1px solid var(--line);padding:10px;margin-bottom:8px;border-radius:8px"><strong>#${esc(o.id.slice(0,8))} ${esc(prod?.nom||'')} ${euro(Math.abs(Number(o.amount)))}</strong><br><button class="btn-primary small" data-action="view-order" data-id="${esc(o.id)}">VOIR</button></div>`}).join("")||"Aucune commande"}</section>`;
+  const orders=(state.transactions||[]).filter(t=>String(t.user_id)===String(u.id)&&t.type==='purchase'); 
+  return `<section class="page-shell"><h1>Mes commandes (${orders.length}) - Liens après confirmation</h1>
+    <p style="color:var(--muted)">Chaque commande confirmée affiche le lien Telegram direct du profil</p>
+    ${orders.map(o=>{
+      const prod=state.products.find(p=>String(p.id)===String(o.product_id)); 
+      const lieu = prod?.lieu || 'Europe';
+      const ville = lieu.split(',')[0]||lieu;
+      const pays = lieu.split(',')[1]||'Europe';
+      const tgLink = tgUrl(prod);
+      return `<div style="border:1px solid var(--line);padding:14px;margin-bottom:12px;border-radius:12px;background:var(--panel)">
+        <div style="display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px">
+          <div>
+            <strong>#${esc(o.id.slice(0,8))} ${esc(prod?.nom||'')} - ${p.age||'?'} ans - ${esc(ville)}, ${esc(pays)} - ${euro(Math.abs(Number(o.amount)))} Payée</strong><br>
+            <small style="color:var(--muted)"><i class="fa-solid fa-location-dot"></i> ${esc(lieu)} | <i class="fa-solid fa-cake"></i> ${prod?.age||'?'} ans</small>
+          </div>
+          <span style="background:var(--success);color:#fff;padding:4px 10px;border-radius:20px;font-size:0.75rem;height:fit-content">✅ Confirmée</span>
+        </div>
+        <div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <button class="btn-primary small" data-action="view-order" data-id="${esc(o.id)}"><i class="fa-solid fa-eye"></i> VOIR + LIEN TELEGRAM</button>
+          <a href="${esc(tgLink)}" target="_blank" class="btn-secondary small" style="text-align:center;text-decoration:none"><i class="fa-brands fa-telegram"></i> ${esc(prod?.telegram_username||'@Polarish87')}</a>
+        </div>
+      </div>`;
+    }).join("")||"<p>Aucune commande - Commandez un profil pour voir le lien Telegram après confirmation</p>"}
+  </section>`;
 }
-function orderDetail(oid){const u=getUser(); if(!state.isPremium && u?.role!=="admin") return subscriptionRequiredScreen(); const o=(state.transactions||[]).find(t=>String(t.id)===String(oid)); if(!o) return `<h1>Commande introuvable</h1>`; const prod=state.products.find(p=>String(p.id)===String(o.product_id)); const url=tgUrl(prod); return `<section class="page-shell"><a href="#/orders" class="btn-secondary">Retour</a><h1>Commande #${esc(o.id.slice(0,8))} Payée</h1><p>Produit: ${esc(prod?.nom||'')} Prix: ${euro(Math.abs(Number(o.amount)))}</p><a href="${esc(url)}" target="_blank" class="btn-primary full"><i class="fa-brands fa-telegram"></i> CONTACTER TELEGRAM</a></section>`}
+function orderDetail(oid){
+  const u=getUser(); if(!state.isPremium && u?.role!=="admin") return subscriptionRequiredScreen(); 
+  const o=(state.transactions||[]).find(t=>String(t.id)===String(oid)); if(!o) return `<h1>Commande introuvable</h1>`; 
+  const prod=state.products.find(p=>String(p.id)===String(o.product_id)); 
+  const url=tgUrl(prod);
+  const lieu = prod?.lieu || 'Europe';
+  const ville = lieu.split(',')[0]||lieu;
+  const pays = lieu.split(',')[1]||'Europe';
+  return `<section class="page-shell" style="max-width:600px;margin:0 auto">
+    <a href="#/orders" class="btn-secondary"><i class="fa-solid fa-arrow-left"></i> Retour</a>
+    <div style="background:var(--panel);border:2px solid var(--success);border-radius:16px;padding:24px;margin-top:16px">
+      <div style="text-align:center;margin-bottom:16px">
+        <div style="font-size:3rem">✅</div>
+        <h1 style="margin:8px 0;color:var(--success)">Commande #${esc(o.id.slice(0,8))} Payée - Confirmée</h1>
+        <p style="color:var(--muted)">Lien Telegram disponible après confirmation</p>
+      </div>
+      <div style="display:grid;gap:10px;background:var(--panel-soft);padding:16px;border-radius:12px;margin-bottom:16px">
+        <div><strong>Profil:</strong> ${esc(prod?.nom||'')} - ${prod?.age||'?'} ans</div>
+        <div><strong>Ville:</strong> ${esc(ville)}</div>
+        <div><strong>Pays:</strong> ${esc(pays)}</div>
+        <div><strong>Lieu complet:</strong> ${esc(lieu)}</div>
+        <div><strong>Prix payé:</strong> ${euro(Math.abs(Number(o.amount)))}</div>
+        <div><strong>Date:</strong> ${new Date(o.created_at).toLocaleString('fr-FR')}</div>
+      </div>
+      <div style="background:rgba(34,158,217,0.1);border:1px solid rgba(34,158,217,0.3);border-radius:12px;padding:16px;text-align:center">
+        <div style="font-weight:800;margin-bottom:8px"><i class="fa-brands fa-telegram" style="color:#229ED9;font-size:1.2rem"></i> Lien Telegram après confirmation</div>
+        <div style="font-size:0.9rem;margin-bottom:12px">Profil: ${esc(prod?.nom||'')} - ${esc(ville)}, ${esc(pays)}</div>
+        <a href="${esc(url)}" target="_blank" class="btn-primary full" style="background:#229ED9;padding:14px;font-size:1.1rem"><i class="fa-brands fa-telegram"></i> CONTACTER ${esc(prod?.nom||'').toUpperCase()} SUR TELEGRAM - ${esc(prod?.telegram_username||'@Polarish87')}</a>
+        <div style="margin-top:10px;font-size:0.8rem;color:var(--muted)">Lien: ${esc(url)}<br>Copiez ce lien, il reste disponible dans Mes commandes</div>
+      </div>
+    </div>
+  </section>`;
+}
 function home(){const u=getUser(); const isSub=state.isPremium; return `<section class="section"><div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px"><h2>Produits Premium ${isSub?'<span style="background:var(--success);color:#fff;padding:4px 10px;border-radius:20px;font-size:0.7rem">Abonné</span>':''}</h2>${u&&!isSub&&u.role!=="admin"?`<a href="#/subscribe" class="btn-primary"><i class="fa-solid fa-crown"></i> S'abonner 5,99€ → Paiement direct</a>`:''}</div><div class="product-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:16px">${state.products.map(card).join("")}</div></section>`}
 function loginPage(){const pend=getPending(); return `<section class="auth-page"><div class="auth-card"><h1>CONNEXION</h1>${pend?`<p>Produit: ${esc(pend.name)}</p>`:''}<form id="login-form"><label>Email<input type="email" name="email" required></label><label>Mot de passe<input type="password" name="password" required></label><button class="btn-primary full">Connexion</button><p style="margin-top:12px;font-size:0.85rem;text-align:center">Pas de compte ? <a href="#/signup">S'inscrire → Paiement 5,99€</a></p></form></div></section>`}
 function signupPage(){return `<section class="auth-page"><div class="auth-card" style="max-width:480px"><h1>Inscription - Étape 1/2</h1><div style="background:rgba(255,138,0,0.12);border:1px solid rgba(255,138,0,0.3);padding:12px;border-radius:10px;margin-bottom:14px"><div style="font-weight:800;margin-bottom:6px"><i class="fa-solid fa-credit-card" style="color:var(--accent)"></i> Paiement direct après inscription</div><div style="font-size:0.9rem;color:var(--muted)">Après création de compte, vous serez redirigé automatiquement vers la page de paiement sécurisé <strong style="color:var(--accent)">5,99€/mois</strong> pour activer votre accès premium immédiatement.</div></div><form id="signup-form"><label>Nom complet<input name="fullName" required placeholder="Votre nom"></label><label>Email<input type="email" name="email" required placeholder="email@exemple.com"></label><label>Mot de passe<input type="password" name="password" required placeholder="Min 6 caractères"></label><button class="btn-primary full" style="padding:14px;font-size:1.1rem;font-weight:800"><i class="fa-solid fa-arrow-right"></i> Créer mon compte → Payer 5,99€</button></form><p style="font-size:0.8rem;color:var(--muted);margin-top:12px;text-align:center"><i class="fa-solid fa-lock"></i> Paiement sécurisé Paddle - Carte, PayPal, Apple Pay<br>Accès immédiat après paiement - Résiliable à tout moment</p></div></section>`}
