@@ -17,10 +17,24 @@ async function refreshUser(){const {data:{user}}=await supabase.auth.getUser();i
 async function checkPremium(){
   try{
     const {data:{session}}=await supabase.auth.getSession(); if(!session?.access_token) return {isActive:false};
-    const res=await fetch('/api/subscription/status',{headers:{Authorization:`Bearer ${session.access_token}`}}); const data=await res.json();
-    state.subscription=data.subscription||null; state.isPremium=!!data.isActive;
+    try {
+      const res=await fetch('/api/subscription/status',{headers:{Authorization:`Bearer ${session.access_token}`}});
+      if(res.ok){
+        const data=await res.json();
+        state.subscription=data.subscription||null; state.isPremium=!!data.isActive;
+        const u=getUser(); if(u){u.is_premium=state.isPremium; setUser(u);}
+        return data;
+      }
+    } catch(apiErr){
+      console.warn("API status failed, fallback Supabase direct", apiErr.message);
+    }
+    // Fallback direct Supabase query
+    const { data, error } = await supabase.from("paddle_subscriptions").select("*").eq("user_id", session.user.id).maybeSingle();
+    if(error) return {isActive:false};
+    const isActive = data && ['active','trialing'].includes(data.status) && (!data.current_period_end || new Date(data.current_period_end) > new Date());
+    state.subscription=data||null; state.isPremium=!!isActive;
     const u=getUser(); if(u){u.is_premium=state.isPremium; setUser(u);}
-    return data;
+    return { subscription: data||null, isActive, isPremium: isActive };
   }catch(e){console.error(e); return {isActive:false}}
 }
 async function hydrate(){try{const {data:products}=await supabase.from("products").select("*").order("created_at",{ascending:false});state.products=products||[];const u=await refreshUser();if(u){const [dep,tx,pm,sub]=await Promise.all([supabase.from("deposit_requests").select("*").order("created_at",{ascending:false}),supabase.from("transactions").select("*").order("created_at",{ascending:false}),supabase.from("payment_methods").select("*").eq("enabled",true),checkPremium()]);state.depositRequests=dep.data||[];state.transactions=tx.data||[];state.paymentMethods=pm.data||[];}}catch(e){console.error(e)}}
@@ -246,10 +260,19 @@ async function openCheckout(){
   try{
     const {data:{session}}=await supabase.auth.getSession(); 
     if(!session?.access_token) throw new Error("Session expirée - reconnectez-vous");
-    const res=await fetch('/api/paddle/create-checkout',{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`}}); 
-    if(!res.ok){ const txt=await res.text(); throw new Error(`Backend /api/paddle/create-checkout ${res.status}`); }
-    const data=await res.json();
-    console.log("Checkout data", data);
+    let data = { priceId: PRICE_ID, customerEmail: session.user?.email || getUser()?.email };
+    try {
+      const res=await fetch('/api/paddle/create-checkout',{method:'POST',headers:{Authorization:`Bearer ${session.access_token}`}}); 
+      if(res.ok){
+        const json = await res.json();
+        data = { ...data, ...json };
+        console.log("Checkout data from API", data);
+      } else {
+        console.warn("API checkout failed, using fallback", res.status, await res.text().then(t=>t.slice(0,200)));
+      }
+    } catch(apiErr){
+      console.warn("API checkout error, fallback to local", apiErr.message);
+    }
     if(!window.Paddle){
       await new Promise((r,j)=>{
         const s=document.createElement('script'); s.src='https://cdn.paddle.com/paddle/v2/paddle.js'; s.onload=()=>{console.log("Paddle.js loaded"); r();}; s.onerror=()=>j(new Error("Paddle.js non chargé - bloqueur pub ?")); document.head.appendChild(s);
