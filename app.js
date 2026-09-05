@@ -82,7 +82,6 @@ function card(p){
         <button class="btn-primary small" data-action="commander" data-id="${esc(p.id)}" style="padding:8px"><i class="fa-solid fa-bolt"></i> COMMANDER</button>
         <button class="btn-secondary small" data-action="view-product" data-id="${esc(p.id)}" style="padding:8px"><i class="fa-solid fa-eye"></i> Voir profil</button>
       </div>
-      <div style="margin-top:8px;font-size:0.7rem;color:var(--muted);text-align:center"><i class="fa-brands fa-telegram" style="color:#229ED9"></i> Telegram: ${esc(tg)} (après confirmation)</div>
     </div>
   </div>`;
 }
