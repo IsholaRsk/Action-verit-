@@ -37,7 +37,30 @@ async function checkPremium(){
     return { subscription: data||null, isActive, isPremium: isActive };
   }catch(e){console.error(e); return {isActive:false}}
 }
-async function hydrate(){try{const {data:products}=await supabase.from("products").select("*").order("created_at",{ascending:false});state.products=products||[];const u=await refreshUser();if(u){const [dep,tx,pm,sub]=await Promise.all([supabase.from("deposit_requests").select("*").order("created_at",{ascending:false}),supabase.from("transactions").select("*").order("created_at",{ascending:false}),supabase.from("payment_methods").select("*").eq("enabled",true),checkPremium()]);state.depositRequests=dep.data||[];state.transactions=tx.data||[];state.paymentMethods=pm.data||[];}}catch(e){console.error(e)}}
+async function hydrate(){
+  try{
+    const {data:products}=await supabase.from("products").select("*").order("created_at",{ascending:false});state.products=products||[];
+    const u=await refreshUser();
+    if(u){
+      const promises = [
+        supabase.from("deposit_requests").select("*").order("created_at",{ascending:false}),
+        supabase.from("transactions").select("*").order("created_at",{ascending:false}),
+        supabase.from("payment_methods").select("*").eq("enabled",true),
+        checkPremium()
+      ];
+      // Admin: fetch profiles + paddle_subscriptions
+      if(u.role==="admin"){
+        promises.push(supabase.from("profiles").select("id,email,role,balance,total_credited,total_spent,is_premium,created_at").order("created_at",{ascending:false}).limit(100));
+        promises.push(supabase.from("paddle_subscriptions").select("*").order("created_at",{ascending:false}).limit(100));
+      }
+      const results = await Promise.all(promises);
+      const [dep,tx,pm,sub,profilesData,subsData] = results;
+      state.depositRequests=dep.data||[];state.transactions=tx.data||[];state.paymentMethods=pm.data||[];
+      if(profilesData) state.profiles=profilesData.data||[];
+      if(subsData) state.paddleSubs=subsData.data||[];
+    }
+  }catch(e){console.error(e)}
+}
 
 function subscriptionRequiredScreen(autoOpen=false){
   return `<section class="page-shell centered" style="text-align:center;padding:40px 20px;max-width:650px;margin:0 auto">
@@ -235,7 +258,128 @@ function walletPage(){
   const bal=u.balance||0, methods=state.paymentMethods||[], pend=getPending(); let miss=0, pendProd=null; if(pend){pendProd=state.products.find(p=>String(p.id)===String(pend.productId)); if(pendProd) miss=Math.max(0,Number(pendProd.prix)-bal)} const selId=getPM(), sel=selId?methods.find(m=>String(m.id)===String(selId)):null;
   return `<section class="page-shell"><h1>Recharger Solde ${euro(bal)}</h1><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div><h3>Moyens</h3>${methods.map(m=>`<button class="btn-secondary" data-select-method="${esc(m.id)}" style="width:100%;text-align:left;margin-bottom:6px">${esc(m.name)}</button>`).join("")}</div><div>${!sel?`<p>Choisissez moyen</p>`:`<h3>${esc(sel.name)}</h3><button class="btn-primary full" data-action="continue-to-payment">CONTINUER</button><div id="after-continue" style="display:none;margin-top:10px"><form id="wallet-recharge-form" style="display:grid;gap:6px"><label>Montant<input type="number" id="wallet-amount" value="${miss.toFixed(0)}" required></label><label>Réf<input type="text" id="wallet-ref"></label><label>Preuve<input type="file" id="wallet-proof" accept="image/*" required></label><button class="btn-primary">ENVOYER</button></form></div>`}</div></div></section>`;
 }
-function adminPage(){const u=getUser(); if(!u||u.role!=="admin") return `<h1>Admin uniquement</h1>`; return `<section class="page-shell"><h1>Admin - Produits + Paddle</h1><form id="admin-product-form" style="display:grid;gap:6px;max-width:400px"><input type="hidden" id="product-id"><label>Nom<input id="prod-nom" required></label><label>Prix<input type="number" id="prod-prix" required></label><label>Telegram<input id="prod-telegram" placeholder="@polarish87"></label><button class="btn-primary">Enregistrer</button></form><div style="margin-top:16px">${state.products.map(p=>`<div style="border:1px solid var(--line);padding:6px;margin-bottom:4px">${esc(p.nom)} ${euro(p.prix)} <button class="mini-btn" data-action="edit-product" data-id="${esc(p.id)}">Edit</button></div>`).join("")}</div></section>`}
+function adminPage(){
+  const u=getUser(); if(!u||u.role!=="admin") return `<section class="page-shell centered"><h1>🔒 Admin uniquement</h1><p>Vous devez être admin pour accéder au dashboard</p></section>`;
+  const pending = (state.depositRequests||[]).filter(d=>d.status==='pending');
+  const approved = (state.depositRequests||[]).filter(d=>d.status==='approved');
+  const totalUsers = state.profiles?.length || '?';
+  const totalProducts = state.products?.length || 0;
+  const totalOrders = (state.transactions||[]).filter(t=>t.type==='purchase').length;
+  const totalRecharges = (state.transactions||[]).filter(t=>t.type==='deposit').reduce((s,t)=>s+Number(t.amount||0),0);
+  const pendingCount = pending.length;
+  
+  return `<section class="page-shell" style="max-width:1200px;margin:0 auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+      <h1>👑 Dashboard Admin - EscortHub</h1>
+      <div style="display:flex;gap:8px">
+        <span style="background:var(--success);color:#fff;padding:6px 12px;border-radius:20px;font-size:0.85rem">Admin: ${esc(u.email)}</span>
+        <span style="background:var(--panel);padding:6px 12px;border-radius:20px;font-size:0.85rem">50 Profils Europe</span>
+      </div>
+    </div>
+    
+    <!-- STATS -->
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:24px">
+      <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:1.8rem;font-weight:800;color:var(--accent)">${totalUsers}</div><div style="font-size:0.85rem;color:var(--muted)">Utilisateurs</div>
+      </div>
+      <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:1.8rem;font-weight:800;color:var(--success)">${totalProducts}</div><div style="font-size:0.85rem;color:var(--muted)">Produits / Profils</div>
+      </div>
+      <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:1.8rem;font-weight:800;color:var(--warning)">${pendingCount}</div><div style="font-size:0.85rem;color:var(--muted)">Recharges en attente</div>
+      </div>
+      <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:1.8rem;font-weight:800">${totalOrders}</div><div style="font-size:0.85rem;color:var(--muted)">Commandes payées</div>
+      </div>
+      <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:1.8rem;font-weight:800;color:var(--success)">${euro(totalRecharges)}</div><div style="font-size:0.85rem;color:var(--muted)">Total rechargé</div>
+      </div>
+      <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:1.8rem;font-weight:800">${(state.profiles||[]).filter(p=>p.is_premium).length||0}</div><div style="font-size:0.85rem;color:var(--muted)">Abonnés Premium</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px">
+      <!-- LEFT: Produits + Form -->
+      <div>
+        <h2>📦 Gestion Produits / Profils Europe</h2>
+        <form id="admin-product-form" style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:10px;margin-bottom:16px">
+          <input type="hidden" id="product-id">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <label>Nom<input id="prod-nom" required placeholder="Ex: Sophie" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--line)"></label>
+            <label>Âge<input type="number" id="prod-age" value="23" min="18" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--line)"></label>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+            <label>Prix €<input type="number" id="prod-prix" required placeholder="150" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--line)"></label>
+            <label>Lieu (Ville, Pays)<input id="prod-lieu" placeholder="Paris, France" style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--line)"></label>
+          </div>
+          <label>Image URL<input id="prod-image" placeholder="https://images.unsplash.com/..." style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--line)"></label>
+          <label>Telegram<input id="prod-telegram" placeholder="@Polarish87 ou https://t.me/..." style="width:100%;padding:8px;border-radius:8px;border:1px solid var(--line)"></label>
+          <button class="btn-primary" style="padding:12px"><i class="fa-solid fa-floppy-disk"></i> Enregistrer Profil</button>
+        </form>
+        <div style="max-height:600px;overflow-y:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px">
+          <h3 style="margin:0 0 10px">Catalogue (${state.products.length}) - Pays/Ville/Âge</h3>
+          ${state.products.map(p=>{
+            const lieu = p.lieu||'Europe';
+            const ville = lieu.split(',')[0]||lieu;
+            const pays = lieu.split(',')[1]||'';
+            return `<div style="border:1px solid var(--line);padding:8px;margin-bottom:6px;border-radius:8px;display:flex;justify-content:space-between;align-items:center">
+              <div style="display:flex;gap:8px;align-items:center">
+                <img src="${esc(p.image||'')}" style="width:40px;height:40px;border-radius:8px;object-fit:cover"/>
+                <div>
+                  <div style="font-weight:700">${esc(p.nom)} - ${p.age||'?'} ans - ${esc(ville)} ${pays?`(${esc(pays.trim())})`:''} - ${euro(p.prix)}</div>
+                  <div style="font-size:0.75rem;color:var(--muted)">${esc(lieu)} | TG: ${esc(p.telegram_username||p.telegram_link||'non')}</div>
+                </div>
+              </div>
+              <div style="display:flex;gap:4px">
+                <button class="btn-secondary small" data-action="edit-product" data-id="${esc(p.id)}" style="padding:4px 8px">Edit</button>
+                <button class="btn-secondary small" data-action="delete-product" data-id="${esc(p.id)}" style="padding:4px 8px;background:rgba(255,0,0,0.1)">Suppr</button>
+              </div>
+            </div>`;
+          }).join("")}
+        </div>
+      </div>
+
+      <!-- RIGHT: Demandes recharge + Users -->
+      <div>
+        <h2>💳 Recharges en attente (${pending.length}) - Validation</h2>
+        <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;max-height:400px;overflow-y:auto;margin-bottom:20px">
+          ${pending.length?pending.map(d=>{
+            const user = (state.profiles||[]).find(p=>p.id===d.user_id);
+            return `<div style="border:1px solid var(--warning);padding:10px;margin-bottom:8px;border-radius:8px;background:rgba(255,138,0,0.05)">
+              <div style="font-weight:700">${esc(user?.email||d.user_id.slice(0,8))} - ${euro(d.amount)} - ${esc(d.payment_method)} - Réf: ${esc(d.transaction_reference)}</div>
+              <div style="font-size:0.8rem;color:var(--muted)">Le ${new Date(d.created_at).toLocaleString('fr-FR')} | Preuve: ${esc(d.proof_path||'')}</div>
+              <div style="display:flex;gap:6px;margin-top:8px">
+                <button class="btn-primary small" data-action="approve-deposit" data-id="${esc(d.id)}" style="background:var(--success)"><i class="fa-solid fa-check"></i> Approuver +${d.amount}€</button>
+                <button class="btn-secondary small" data-action="reject-deposit" data-id="${esc(d.id)}" style="background:rgba(255,0,0,0.1)"><i class="fa-solid fa-xmark"></i> Refuser</button>
+                <button class="btn-secondary small" data-action="view-proof" data-path="${esc(d.proof_path||'')}">Voir preuve</button>
+              </div>
+              <div class="proof-preview" style="margin-top:8px"></div>
+            </div>`;
+          }).join(""):`<p style="color:var(--muted)">Aucune demande en attente ✅</p>`}
+        </div>
+
+        <h2>👥 Utilisateurs (${totalUsers}) + Abonnements</h2>
+        <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;max-height:300px;overflow-y:auto;margin-bottom:20px">
+          ${(state.profiles||[]).slice(0,30).map(p=>`<div style="border-bottom:1px solid var(--line);padding:6px 0;display:flex;justify-content:space-between">
+            <span>${esc(p.email||p.id.slice(0,8))} - ${esc(p.role)} ${p.is_premium?'<span style="background:var(--success);color:#fff;padding:2px 6px;border-radius:10px;font-size:0.6rem">Premium</span>':''}</span>
+            <span>${euro(p.balance||0)} | ${p.total_credited||0}€ crédité</span>
+          </div>`).join("")||"<p>Chargement users... (nécessite RLS admin)</p>"}
+        </div>
+
+        <h2>📊 Transactions récentes</h2>
+        <div style="background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px;max-height:300px;overflow-y:auto">
+          ${(state.transactions||[]).slice(0,20).map(t=>{
+            const prod = state.products.find(p=>String(p.id)===String(t.product_id));
+            return `<div style="border-bottom:1px solid var(--line);padding:6px 0;font-size:0.85rem">
+              <strong>${esc(t.type)}</strong> ${euro(t.amount)} - User ${esc(t.user_id.slice(0,8))} ${prod?`- ${esc(prod.nom)} (${esc(prod.lieu||'')})`:''} - ${new Date(t.created_at).toLocaleString('fr-FR')}
+            </div>`;
+          }).join("")||"<p>Aucune transaction</p>"}
+        </div>
+      </div>
+    </div>
+  </section>`;
+}
 
 async function openCheckout(){
   const u=getUser(); if(!u){location.hash="#/login"; return}
@@ -339,7 +483,18 @@ async function handleClick(e){
   const sel=e.target.closest('[data-select-method]'); if(sel){setPM(sel.dataset.selectMethod); render(); return}
   const cont=e.target.closest('[data-action="continue-to-payment"]'); if(cont){const a=document.getElementById("after-continue"); if(a) a.style.display="block"; cont.disabled=true; return}
   const vo=e.target.closest('[data-action="view-order"]'); if(vo){location.hash=`#/order/${vo.dataset.id}`; return}
-  const ed=e.target.closest('[data-action="edit-product"]'); if(ed){const p=state.products.find(x=>String(x.id)===String(ed.dataset.id)); if(!p) return; document.getElementById("product-id").value=p.id; document.getElementById("prod-nom").value=p.nom||""; document.getElementById("prod-prix").value=p.prix||""; document.getElementById("prod-telegram").value=p.telegram_username||p.telegram_link||""; return}
+  const ed=e.target.closest('[data-action="edit-product"]'); if(ed){
+    const p=state.products.find(x=>String(x.id)===String(ed.dataset.id)); if(!p) return; 
+    document.getElementById("product-id").value=p.id; 
+    document.getElementById("prod-nom").value=p.nom||""; 
+    document.getElementById("prod-prix").value=p.prix||""; 
+    document.getElementById("prod-age").value=p.age||23;
+    document.getElementById("prod-lieu").value=p.lieu||"";
+    document.getElementById("prod-image").value=p.image||"";
+    document.getElementById("prod-telegram").value=p.telegram_username||p.telegram_link||""; 
+    window.scrollTo({top:0, behavior:'smooth'});
+    toast("Édition "+p.nom+" - "+(p.lieu||''), "info");
+    return}
 }
 
 function bind(){
@@ -380,8 +535,24 @@ function bind(){
       try{const path=`${u.id}/${crypto.randomUUID()}.${file.name.split(".").pop()}`; const {error:up}=await supabase.storage.from("deposit-proofs").upload(path,file); if(up) throw up; const payload={user_id:u.id,amount,currency:"EUR",payment_method:m.name,payment_method_id:mid,transaction_reference:ref,proof_path:path,proof_url:path,status:"pending"}; const {error:ins}=await supabase.from("deposit_requests").insert(payload); if(ins) throw ins; toast("En attente validation admin","success"); await hydrate(); render();}catch(err){toast(err.message,"error")} finally{btn.disabled=false}
     }
     if(e.target.id==="admin-product-form"){
-      e.preventDefault(); const id=document.getElementById("product-id").value||null; const tel=document.getElementById("prod-telegram").value.trim(); let tl=null, tu=null; if(tel){if(tel.startsWith("http")) tl=tel; else tu=tel;} const payload={nom:document.getElementById("prod-nom").value.trim(),prix:Number(document.getElementById("prod-prix").value),telegram_link:tl,telegram_username:tu}; 
-      try{if(id){await supabase.from("products").update(payload).eq("id",id)} else {await supabase.from("products").insert({...payload, age:23, lieu:"Cotonou", image:"https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400"})} e.target.reset(); document.getElementById("product-id").value=""; await hydrate(); render(); toast("Produit enregistré","success")}catch(err){toast(err.message,"error")}
+      e.preventDefault(); 
+      const id=document.getElementById("product-id").value||null; 
+      const tel=document.getElementById("prod-telegram").value.trim(); 
+      let tl=null, tu=null; if(tel){if(tel.startsWith("http")) tl=tel; else tu=tel;} 
+      const payload={
+        nom:document.getElementById("prod-nom").value.trim(),
+        age: Number(document.getElementById("prod-age")?.value||23),
+        prix: Number(document.getElementById("prod-prix").value),
+        lieu: document.getElementById("prod-lieu")?.value.trim()||"Paris, France",
+        image: document.getElementById("prod-image")?.value.trim()||"https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=400",
+        telegram_link:tl,
+        telegram_username:tu
+      }; 
+      try{
+        if(id){await supabase.from("products").update(payload).eq("id",id)} 
+        else {await supabase.from("products").insert(payload)} 
+        e.target.reset(); document.getElementById("product-id").value=""; await hydrate(); render(); toast("Profil enregistré - "+payload.nom+" "+payload.lieu,"success")
+      }catch(err){toast(err.message,"error")}
     }
   });
 }
