@@ -13,7 +13,7 @@ const setPM=id=>{if(id)localStorage.setItem("pending-payment-method",id);else lo
 const tgUrl=p=>{if(p?.telegram_link)return p.telegram_link.startsWith('http')?p.telegram_link:`https://t.me/${p.telegram_link.replace('@','')}`; if(p?.telegram_username)return `https://t.me/${p.telegram_username.replace('@','')}`; return CONFIG.DEFAULT_REDIRECT||'https://t.me/Polarish87'};
 const PRICE_ID="pri_01m1e8e2ybr9rjmaq0kz4ezpnk";
 function toast(m,t="info"){const c=$("#toast-container");if(!c)return;const d=document.createElement("div");d.className=`toast ${t}`;d.innerHTML=`<span>${esc(m)}</span>`;c.appendChild(d);setTimeout(()=>d.remove(),4000)}
-async function refreshUser(){const {data:{user}}=await supabase.auth.getUser();if(!user){setUser(null);return null}let p=null;try{const {data}=await supabase.from("profiles").select("id,role,balance,email,username,is_premium,premium_until").eq("id",user.id).maybeSingle();p=data}catch{}const cur={id:user.id,email:user.email,role:p?.role||"user",balance:Number(p?.balance||0),username:p?.username||"",is_premium:!!p?.is_premium};setUser(cur);return cur}
+async function refreshUser(){const {data:{user}}=await supabase.auth.getUser();if(!user){setUser(null);return null}let p=null;try{const {data}=await supabase.from("profiles").select("id,role,balance,email,username").eq("id",user.id).maybeSingle();p=data}catch(e){console.warn("refreshUser profiles error", e.message)}const cur={id:user.id,email:user.email,role:p?.role||"user",balance:Number(p?.balance||0),username:p?.username||"",is_premium:false};setUser(cur);return cur}
 async function checkPremium(){
   try{
     const {data:{session}}=await supabase.auth.getSession(); if(!session?.access_token) return {isActive:false};
