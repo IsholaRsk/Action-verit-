@@ -1,0 +1,886 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Génère 1064 cartes « brulant » (616 actions + 448 vérités)
++ 2000 cartes « hardcore » (1160 actions + 840 vérités), puis reconstruit :
+  - cards.json          (436 + 1064 + 2000 = 3500 cartes)
+  - supabase.sql        (installation complète)
+  - migration_cards.sql (migration pour base existante)
+"""
+import json
+import random
+
+random.seed(7)
+
+# ----------------------------------------------------------------------
+# 1) Lire les 436 cartes existantes (dédup)
+# ----------------------------------------------------------------------
+raw = open("/home/user/uploads/Json a ou v.txt", encoding="utf-8").read()
+lines = raw.split("\n")
+start = next(i for i, l in enumerate(lines) if l.strip() == "[")
+end = next(i for i, l in enumerate(lines) if l.strip() == "]")
+src = json.loads("\n".join(lines[start:end + 1]))
+
+TYPE = {"verite": "truth", "action": "dare"}
+existing_texts = {d["text"] for d in src}
+
+# ----------------------------------------------------------------------
+# 2) Slots partagés
+# ----------------------------------------------------------------------
+P = [
+    "la personne à ta droite",
+    "la personne à ta gauche",
+    "la personne en face de toi",
+    "la personne de ton choix",
+    "quelqu'un qui accepte",
+    "la personne la plus proche de toi",
+]
+ZMASS = [
+    "le cou", "la nuque", "les épaules", "les tempes", "le cuir chevelu",
+    "le bas du dos", "les mains", "les avant-bras", "les mollets",
+    "les omoplates", "le visage", "les pieds", "le ventre", "les trapèzes",
+    "les hanches", "le sternum",
+]
+ZKISS = [
+    "le cou", "la nuque", "la clavicule", "l'épaule", "le lobe de l'oreille",
+    "l'intérieur du poignet", "le creux du coude", "le bas du dos",
+    "le ventre", "la mâchoire", "le sternum", "l'intérieur du bras",
+    "la cheville", "le genou", "la tempe", "le dos de la main",
+]
+ZSOUFFLE = ["le cou", "l'oreille", "la nuque"]
+D = ["15 secondes", "20 secondes", "30 secondes", "1 minute", "2 minutes"]
+
+# ----------------------------------------------------------------------
+# 3) Génération des actions (candidates)
+# ----------------------------------------------------------------------
+action_candidates = []
+for p in P:
+    for z in ZMASS:
+        for d in D:
+            action_candidates.append(f"Masse {z} de {p} pendant {d}, de façon très sensuelle.")
+    for z in ZKISS:
+        for d in D:
+            action_candidates.append(f"Embrasse {z} de {p} pendant {d}.")
+            action_candidates.append(f"Mordille doucement {z} de {p} pendant {d}.")
+            action_candidates.append(f"Fais glisser un glaçon sur {z} de {p} pendant {d}.")
+            action_candidates.append(f"Fais glisser tes doigts très lentement sur {z} de {p} pendant {d}.")
+        action_candidates.append(f"Lèche lentement {z} de {p}.")
+        action_candidates.append(f"Fais un suçon léger sur {z} de {p}.")
+    for z in ZSOUFFLE:
+        for d in D:
+            action_candidates.append(f"Souffle doucement dans {z} de {p} pendant {d}.")
+    action_candidates.append(f"Chuchote une phrase très osée à l'oreille de {p}.")
+    for d in D:
+        action_candidates.append(f"Regarde {p} droit dans les yeux pendant {d}, sans détourner le regard.")
+
+CURATED_ACTIONS = [
+    "Bande les yeux de la personne de ton choix, puis fais-lui deviner un objet au toucher.",
+    "Fais goûter un aliment à la personne en face de toi en le tenant entre tes lèvres.",
+    "Fais un body shot au miel sur le cou de la personne de ton choix.",
+    "Attache les poignets de quelqu'un qui accepte avec une écharpe pendant 2 minutes.",
+    "Fais deviner un mot en le traçant avec ton doigt dans le dos de la personne à ta gauche.",
+    "Récite les jours de la semaine en posant tes lèvres sur le cou de la personne à ta droite entre chaque mot.",
+    "Fais un câlin de 30 secondes à la personne de ton choix en respirant dans son cou.",
+    "Glisse un glaçon sous le t-shirt de la personne en face de toi et remonte-le avec ta bouche.",
+    "Lance une musique sensuelle et danse à 20 centimètres de la personne de ton choix sans la toucher.",
+    "Fais semblant de dégrafer un bouton imaginaire du haut de la personne à ta droite, très lentement.",
+    "Ferme les yeux et laisse la personne de ton choix toucher ton visage pendant 30 secondes.",
+    "Décris à voix haute, sans censure, la tenue que tu aimerais voir sur la personne de ton choix.",
+    "Masse les épaules de la personne à ta gauche en soufflant dans sa nuque à chaque expiration.",
+    "Lèche du sirop sur la clavicule de la personne de ton choix.",
+    "Trace le contour des lèvres de la personne en face de toi avec ton doigt, puis effleure-les de tes lèvres.",
+    "Fais glisser une plume imaginaire du coude jusqu'à l'épaule de la personne à ta droite.",
+    "Porte la personne de ton choix dans tes bras pendant 15 secondes (ou essaie).",
+    "Fais un selfie très proche avec la personne à ta droite, vos lèvres à un doigt d'écart.",
+    "Mime un strip-tease de 15 secondes sans retirer le moindre vêtement, rien que par la gestuelle.",
+    "Chuchote à la personne à ta gauche un secret que tu n'as jamais dit à voix haute.",
+    "Laisse la personne de ton choix choisir une zone de ton corps à masser pendant 1 minute.",
+    "Fais deviner un fruit en le traçant avec ta langue sur l'avant-bras de la personne en face de toi.",
+    "Masse la mâchoire de la personne à ta droite en la regardant intensément.",
+    "Enlace la personne de ton choix par-derrière et balance-toi doucement avec elle pendant 30 secondes.",
+    "Fais glisser un glaçon de ta bouche à celle de la personne de ton choix sans les mains.",
+    "Écris un mot coquin dans le dos de la personne en face de toi avec le bout de ton doigt, elle doit le deviner.",
+    "Tiens le visage de la personne à ta droite entre tes mains et rapproche tes lèvres sans l'embrasser.",
+    "Fais un massage de la nuque à la personne de ton choix en chuchotant ce que tu aimes chez elle.",
+    "Laisse quelqu'un qui accepte poser sa main sur ton cœur pendant 30 secondes.",
+    "Fais glisser tes lèvres sur le trajet d'un glaçon qui fond sur la peau de la personne à ta gauche.",
+]
+action_candidates += CURATED_ACTIONS
+
+# Contractions françaises (au/du/aux/des)
+def fix(t):
+    t = t.replace(" à le ", " au ").replace(" à les ", " aux ")
+    t = t.replace(" de le ", " du ").replace(" de les ", " des ")
+    t = t.replace("jusqu'à le ", "jusqu'au ").replace("jusqu'à les ", "jusqu'aux ")
+    return t
+
+# Les cartes d'action visent toujours une personne du sexe opposé
+def opposite_sex(t):
+    t = t.replace("la personne", "la personne du sexe opposé")
+    t = t.replace("une personne", "une personne du sexe opposé")
+    t = t.replace("chaque personne", "chaque personne du sexe opposé")
+    t = t.replace("quelqu'un", "quelqu'un du sexe opposé")
+    t = t.replace("chaque joueur", "chaque joueur du sexe opposé")
+    return t
+
+action_candidates = [fix(t) for t in action_candidates]
+
+# Dédup + échantillon
+def dedup(cands, existing):
+    seen = set(existing)
+    out = []
+    for c in cands:
+        if c not in seen:
+            seen.add(c)
+            out.append(c)
+    return out
+
+new_actions = dedup(action_candidates, existing_texts)
+random.shuffle(new_actions)
+new_actions = new_actions[:616]
+
+# ----------------------------------------------------------------------
+# 4) Génération des vérités (candidates)
+# ----------------------------------------------------------------------
+ZQ = [
+    "la nuque", "l'oreille", "le cou", "la clavicule", "le bas du dos",
+    "l'intérieur du poignet", "la mâchoire", "le ventre", "le creux du coude", "la tempe",
+]
+SQ = [
+    "te souffle dans la nuque",
+    "te mordille le lobe de l'oreille",
+    "passe le bout de ses doigts le long de ta colonne",
+    "te caresse l'intérieur du poignet",
+    "t'embrasse dans le creux du coude",
+    "te masse les tempes",
+    "glisse un glaçon dans ton cou",
+    "te tient par la nuque",
+    "trace des cercles sur ton ventre",
+    "te murmure quelque chose à l'oreille",
+    "tire doucement sur tes cheveux",
+    "pose sa main sur ta cuisse",
+]
+AT = [
+    "As-tu déjà eu envie d'embrasser quelqu'un au beau milieu d'une phrase banale ?",
+    "As-tu déjà senti un frisson parcourir tout ton corps juste parce qu'on t'a effleuré la main ?",
+    "As-tu déjà été incapable de te concentrer parce que quelqu'un dans la pièce te regardait ?",
+    "As-tu déjà rêvé qu'un inconnu te faisait quelque chose d'inavouable, au point d'y penser au réveil ?",
+    "As-tu déjà dû croiser les jambes pour cacher ton trouble pendant un dîner ?",
+    "As-tu déjà gardé un suçon plus longtemps que prévu rien que pour t'en souvenir ?",
+    "As-tu déjà frôlé volontairement quelqu'un en prétendant que c'était un accident ?",
+    "As-tu déjà porté un parfum uniquement parce qu'il plaisait à quelqu'un ?",
+    "As-tu déjà envoyé un message que tu as regretté une seconde après, poussé par le désir ?",
+    "As-tu déjà laissé quelqu'un te toucher plus longtemps que tu ne l'aurais cru possible ?",
+    "As-tu déjà inventé un prétexte pour rester seul(e) avec quelqu'un de ce groupe ?",
+    "As-tu déjà senti la tension monter pendant un simple échange de regards avec un inconnu ?",
+    "As-tu déjà imaginé la bouche de quelqu'un ici sur ta peau, ne serait-ce qu'une seconde ?",
+    "As-tu déjà fait semblant de ne pas remarquer qu'on te draguait, juste pour prolonger le jeu ?",
+    "As-tu déjà eu besoin de te mordre la lèvre pour ne pas dire ce que tu pensais à quelqu'un ?",
+    "As-tu déjà senti la chaleur d'un corps sans même qu'il te touche ?",
+    "As-tu déjà fait un détour dans une pièce uniquement pour frôler quelqu'un ?",
+    "As-tu déjà répondu à un message à 2 heures du matin en sachant très bien ce que ça signifiait ?",
+    "As-tu déjà laissé un baiser s'éterniser bien plus longtemps que prévu ?",
+    "As-tu déjà eu un geste d'affection envers quelqu'un que tu regrettes de ne pas avoir poussé plus loin ?",
+    "As-tu déjà ressenti ton cœur s'accélérer parce que quelqu'un s'est assis juste à côté de toi ?",
+    "As-tu déjà murmuré quelque chose d'osé à quelqu'un sans même réfléchir ?",
+    "As-tu déjà embrassé quelqu'un dans un endroit où tu n'aurais jamais pensé le faire ?",
+    "As-tu déjà délibérément gardé la main de quelqu'un dans la tienne un peu trop longtemps ?",
+    "As-tu déjà vécu un moment si électrique que tu y repenses encore des années après ?",
+    "As-tu déjà répondu « viens » à quelqu'un sans hésiter une seule seconde ?",
+    "As-tu déjà eu le souffle coupé parce que quelqu'un te regardait fixement ?",
+    "As-tu déjà offert un massage qui s'est terminé bien différemment de ce que tu avais prévu ?",
+    "As-tu déjà joué à ce jeu avec quelqu'un dans le seul but de te rapprocher de lui/elle ?",
+    "As-tu déjà ressenti la jalousie te pousser à séduire quelqu'un sous les yeux d'un autre ?",
+    "As-tu déjà chuchoté à quelqu'un un secret que tu n'aurais jamais osé lui dire en face ?",
+    "As-tu déjà fait une promesse un peu folle à quelqu'un juste après l'avoir embrassé ?",
+    "As-tu déjà attendu que tout le monde quitte la pièce pour parler à quelqu'un en particulier ?",
+    "As-tu déjà été surpris(e) de toi-même en découvrant que tu aimais qu'on te donne des ordres (ou que tu aimais en donner) ?",
+    "As-tu déjà écrit puis effacé un message trop honnête, de peur des conséquences ?",
+    "As-tu déjà reçu une photo qui t'a fait monter la température immédiatement ?",
+    "As-tu déjà fait semblant d'avoir froid pour qu'on se rapproche de toi ?",
+    "As-tu déjà provoqué quelqu'un exprès, juste pour voir jusqu'où il ou elle irait ?",
+    "As-tu déjà embrassé quelqu'un en pleine rue sans te soucier des regards ?",
+    "As-tu déjà laissé un vêtement chez quelqu'un volontairement, comme prétexte pour revenir ?",
+]
+QC = [
+    "Quelle est la chose que tu remarques en premier chez quelqu'un qui te plaît ?",
+    "Quelle est la partie de ton corps que tu adorerais qu'on découvre ce soir ?",
+    "Quelle est la chose que tu es capable de faire avec tes mains dont tu es le plus fier/fière ?",
+    "Quelle est la zone de quelqu'un ici que tu regardes sans arrêt sans le faire exprès ?",
+    "Quelle est la chose la plus douce qu'on puisse te faire sans te toucher ?",
+    "Quelle est la tenue dans laquelle tu te sens le plus désirable ?",
+    "Quelle est la chose que tu aimerais entendre dans la bouche de la personne de ton choix ?",
+    "Quelle est la partie de ton corps que tu protèges le plus et pourquoi ?",
+    "Quelle est la chose que tu préfères faire avec ta bouche quand tu embrasses ?",
+    "Quelle est la caresse la plus simple qui te fait pourtant fondre ?",
+    "Quelle est la chose que tu attends de la personne de ton choix sans jamais le lui dire ?",
+    "Quelle est la partie du corps de quelqu'un ici sur laquelle tu poserais tes mains si tu osais ?",
+    "Quelle est la chose la plus audacieuse que tu as faite pour plaire physiquement ?",
+    "Quelle est la phrase qu'on te dit qui te donne le plus envie de rapprochement ?",
+    "Quelle est la chose que tu ne laisses voir que quand tu te sens en totale confiance ?",
+    "Quelle est la partie de ton corps qui réagit en premier quand tu es attiré(e) ?",
+    "Quelle est la chose que tu rêves de faire à deux mais que tu n'as jamais proposée ?",
+    "Quelle est la sensation que tu recherches le plus dans un contact prolongé ?",
+    "Quelle est la partie de toi que tu aimerais qu'on touche en premier ce soir ?",
+    "Quelle est la chose que tu fais pour te donner du courage avant d'aborder quelqu'un ?",
+    "Quelle est la limite que tu refuses de franchir, même dans le feu de l'action ?",
+    "Quelle est la chose que tu as découverte sur ton corps récemment ?",
+    "Quelle est la partie de quelqu'un ici qui pourrait te faire craquer sur-le-champ ?",
+    "Quelle est la chose que tu aimes qu'on te fasse sans que tu aies à demander ?",
+    "Quelle est la phrase de drague la plus efficace qu'on t'ait dite ?",
+    "Quelle est la chose que tu adores offrir à quelqu'un sans rien attendre en retour ?",
+    "Quelle est la zone de ton cou que tu préfères qu'on touche ?",
+    "Quelle est la chose qui te donne instantanément confiance en toi dans un rapprochement ?",
+    "Quelle est la partie de ton corps que tu montres avec le plus de fierté ?",
+    "Quelle est la chose que tu aimerais qu'on t'écrive à l'oreille avec le bout du doigt ?",
+    "Quelle est la sensation que tu n'as jamais osé réclamer de peur du jugement ?",
+    "Quelle est la chose que tu ne peux pas t'empêcher de faire quand quelqu'un te frôle ?",
+    "Quelle est la partie du visage de quelqu'un que tu regardes en dernier avant de l'embrasser ?",
+    "Quelle est la chose que tu aimerais essayer avec quelqu'un en qui tu as une confiance absolue ?",
+    "Quelle est la chanson qui te donne immédiatement envie de te rapprocher de quelqu'un ?",
+    "Quelle est la chose la plus romantique ET la plus chaude qu'on t'ait jamais faite ?",
+    "Quelle est la partie de toi que tu ne laisses toucher qu'à une personne très spéciale ?",
+    "Quelle est la chose que tu aimerais qu'on te fasse à la toute fin de cette soirée ?",
+    "Quelle est la question que tu espères que quelqu'un te pose ce soir ?",
+    "Quelle est la chose que tu gardes sous silence depuis trop longtemps ?",
+]
+QE = [
+    "Qu'est-ce qui te donne le plus envie de te rapprocher de quelqu'un ?",
+    "Qu'est-ce que tu fais pour faire comprendre à quelqu'un qu'il ou elle te plaît ?",
+    "Qu'est-ce qui te fait le plus craquer chez la personne de ton choix ici ?",
+    "Qu'est-ce qu'un simple regard peut te faire dire que tu n'aurais jamais dit autrement ?",
+    "Qu'est-ce que tu adores qu'on te fasse dans le dos, sans prévenir ?",
+    "Qu'est-ce qui te rend le plus vulnérable dans les bras de quelqu'un ?",
+    "Qu'est-ce que tu remarques en premier chez quelqu'un qui t'attire physiquement ?",
+    "Qu'est-ce qui te fait fondre plus vite : les mots ou les gestes ?",
+    "Qu'est-ce que tu fais avec tes yeux quand tu veux séduire sans parler ?",
+    "Qu'est-ce que tu attends le plus d'un massage : la détente ou autre chose ?",
+    "Qu'est-ce qui t'a déjà fait rougir alors que personne ne t'avait touché ?",
+    "Qu'est-ce que tu aimerais qu'on t'offre comme attention ce soir ?",
+    "Qu'est-ce qui te fait le plus d'effet : un murmure, un effleurement ou un regard ?",
+    "Qu'est-ce que tu penses que les autres voient en toi sans que tu le saches ?",
+    "Qu'est-ce que tu fais pour cacher ton trouble quand quelqu'un te plaît ?",
+    "Qu'est-ce qui t'empêche parfois de faire le premier pas ?",
+    "Qu'est-ce que tu aimerais qu'on te dise pendant que tu embrasses ?",
+    "Qu'est-ce qui te donne envie d'être un peu plus audacieux/audacieuse ce soir ?",
+    "Qu'est-ce que tu recherches dans un contact visuel prolongé ?",
+    "Qu'est-ce que tu voudrais que quelqu'un fasse de ses mains en ce moment ?",
+    "Qu'est-ce qui te rassure le plus chez quelqu'un avec qui tu te rapproches ?",
+    "Qu'est-ce que tu as appris sur toi grâce à ce genre de jeux ?",
+    "Qu'est-ce qui te donne des frissons rien qu'en y pensant ?",
+    "Qu'est-ce que tu oserais faire ce soir que tu n'as jamais osé ?",
+    "Qu'est-ce que tu aimes chez toi que peu de gens remarquent ?",
+    "Qu'est-ce que tu fais de ta voix quand tu veux être irrésistible ?",
+    "Qu'est-ce qui te fait rester : le frisson du jeu ou la personne en face ?",
+    "Qu'est-ce que tu aimerais qu'on te demande à voix basse ?",
+    "Qu'est-ce qui rend une accolade différente de toutes les autres ?",
+    "Qu'est-ce que tu attends de la personne qui osera te choisir ce soir ?",
+]
+TD = [
+    "Décris le bruit que tu aimerais entendre de la part de la personne de ton choix.",
+    "Décris la façon dont tu aimerais être approché(e) par quelqu'un qui te plaît.",
+    "Décris le moment précis où tu sais qu'un simple jeu va plus loin.",
+    "Décris ce que tu ressens quand quelqu'un te frôle « par accident ».",
+    "Décris l'endroit où tu rêves qu'on t'embrasse un jour.",
+    "Décris la caresse idéale que tu n'as jamais reçue.",
+    "Décris comment tu sais, sans un mot, que quelqu'un te désire.",
+    "Décris ce que tu aimerais qu'il se passe dans les dix prochaines minutes.",
+    "Décris la façon dont tu te sens quand tu es le centre de l'attention de quelqu'un.",
+    "Décris le premier geste que tu ferais à la personne de ton choix si tout était permis.",
+    "Décris la sensation d'un baiser qu'on attend depuis trop longtemps.",
+    "Décris ce que tu vois chez quelqu'un ici qui te donne envie de rester.",
+    "Décris l'atmosphère parfaite pour que tu te laisses aller.",
+    "Décris ce que tes mains feraient d'elles-mêmes si personne ne regardait.",
+    "Décris le regard que tu poserais sur la personne de ton choix avant de l'embrasser.",
+    "Décris ce que tu voudrais qu'on te fasse quand tu fermes les yeux.",
+    "Décris la dernière fois où ton corps a réagi avant ton cerveau.",
+    "Décris ce qui te fait t'attarder chez quelqu'un alors que tu devrais partir.",
+    "Décris le moment où un simple contact devient une promesse.",
+    "Décris ce que tu attends d'une soirée comme celle-ci, honnêtement.",
+    "Décris la distance exacte à laquelle tu aimerais que la personne de ton choix se tienne.",
+    "Décris ce que tu ferais si la personne en face de toi faisait le premier pas.",
+    "Décris la musique que tu mettrais pour un rapprochement parfait.",
+    "Décris ce que tu aimerais découvrir chez quelqu'un ici, sans censure.",
+    "Décris la façon dont tu veux qu'on te dise qu'on a envie de toi.",
+    "Décris le souvenir le plus chaud que tu associes à une simple main posée sur toi.",
+    "Décris ce que tu ressens quand une conversation devient chuchotement.",
+    "Décris l'endroit de la pièce où tu aimerais te retrouver seul(e) avec quelqu'un.",
+    "Décris ce que tu attendais de ce jeu en arrivant, et ce que tu espères maintenant.",
+    "Décris la promesse que tu ferais à la personne de ton choix si elle était prête à tout entendre.",
+]
+SI = [
+    "Si tu pouvais demander un massage à quelqu'un ici, quelle zone choisirais-tu ?",
+    "Si tu devais embrasser quelqu'un dans cette pièce les yeux fermés, vers qui irais-tu ?",
+    "Si tu pouvais passer une heure seul(e) avec quelqu'un ici, qui choisirais-tu et pourquoi ?",
+    "Si tu pouvais demander une seule chose à la personne de ton choix ce soir, ce serait quoi ?",
+    "Si tu devais chuchoter un secret coquin à quelqu'un ici, que dirais-tu ?",
+    "Si tu pouvais échanger une partie de ton corps avec celle de quelqu'un, laquelle ?",
+    "Si tu pouvais réécrire ton premier baiser, que changerais-tu ?",
+    "Si tu devais décrire la personne de ton choix en trois mots interdits en public, lesquels ?",
+    "Si tu pouvais être touché(e) par quelqu'un ici à un seul endroit, lequel ?",
+    "Si tu pouvais danser avec quelqu'un ici sans aucun témoin, qui choisirais-tu ?",
+    "Si tu devais envoyer un message osé à quelqu'un ici, à qui et quoi ?",
+    "Si tu pouvais demander à quelqu'un de t'embrasser n'importe où, où serait-ce ?",
+    "Si tu pouvais exaucer un désir de la personne de ton choix, lequel espères-tu ?",
+    "Si tu devais partager un lit avec quelqu'un ici sans rien faire d'autre, qui ?",
+    "Si tu pouvais lire dans les pensées de quelqu'un ici, qui choisirais-tu ?",
+    "Si tu devais laisser un mot sur la peau de quelqu'un ici, qu'écrirais-tu ?",
+    "Si tu pouvais réessayer un moment raté avec quelqu'un, lequel ?",
+    "Si tu pouvais donner un surnom coquin à la personne de ton choix, lequel ?",
+    "Si tu devais choisir un joueur pour te faire un massage les yeux fermés, qui ?",
+    "Si tu pouvais emmener quelqu'un ici en week-end, qui et où ?",
+    "Si tu pouvais demander à quelqu'un de te souffler une phrase dans le cou, laquelle ?",
+    "Si tu pouvais recevoir un baiser de quelqu'un ici sans conséquence, de qui ?",
+    "Si tu devais décrire l'endroit où tu te sens le plus vulnérable, lequel ?",
+    "Si tu pouvais choisir la prochaine carte de quelqu'un ici, que choisirais-tu ?",
+    "Si tu pouvais offrir un dernier verre à quelqu'un ici, à qui et pourquoi ?",
+    "Si tu pouvais demander à quelqu'un de te tenir la main toute la soirée, qui ?",
+    "Si tu pouvais t'asseoir sur les genoux de quelqu'un ici, qui choisirais-tu ?",
+    "Si tu devais avouer ton plus gros fantasme, à qui le dirais-tu ?",
+    "Si tu pouvais recevoir un compliment par minute de la part de quelqu'un ici, de qui ?",
+    "Si tu pouvais choisir une musique pour danser collé(e)-serré(e) avec quelqu'un, laquelle ?",
+    "Si tu devais donner un massage à quelqu'un ici, qui et où ?",
+    "Si tu pouvais faire fondre un glaçon sur la peau de quelqu'un ici, sur qui ?",
+    "Si tu pouvais demander à quelqu'un de te murmurer ce que tu veux, quoi ?",
+    "Si tu pouvais être la personne que tout le monde veut choisir ce soir, le serais-tu ?",
+    "Si tu devais partager un baiser en trois secondes avec quelqu'un ici, qui ?",
+    "Si tu pouvais recevoir une lettre coquine, de qui l'aimerais-tu ?",
+    "Si tu pouvais t'endormir contre quelqu'un ici sans aucune gêne, qui ?",
+    "Si tu pouvais demander une faveur sensuelle à la personne de ton choix, laquelle ?",
+    "Si tu devais choisir quelqu'un ici pour un slow, qui choisirais-tu ?",
+    "Si tu pouvais connaître le désir secret de quelqu'un ici, de qui ?",
+    "Si tu pouvais offrir un massage d'une heure à quelqu'un ici, à qui ?",
+    "Si tu devais laisser quelqu'un ici choisir ta prochaine action, qui ?",
+    "Si tu pouvais retirer un vêtement à quelqu'un ici (avec son accord), lequel ?",
+    "Si tu pouvais être le personnage principal du fantasme de quelqu'un ici, qui aimerais-tu que ce soit ?",
+    "Si tu devais embrasser la main de quelqu'un ici en public, de qui ?",
+    "Si tu pouvais demander à quelqu'un de te border comme un rituel, qui ?",
+    "Si tu pouvais revivre la première fois où quelqu'un t'a vraiment désiré(e), avec qui ?",
+    "Si tu pouvais demander à quelqu'un ici de rester après la fin du jeu, qui ?",
+    "Si tu devais avouer une envie que tu n'as jamais dite, laquelle ?",
+    "Si tu pouvais poser une seule question osée à la personne de ton choix, laquelle ?",
+]
+
+QR = [
+    "Qui dans cette pièce te fait le plus d'effet, et qu'est-ce qui te plaît chez lui/elle ?",
+    "Quel est le compliment le plus osé qu'on puisse te faire sans te gêner ?",
+    "Quel joueur ici mériterait selon toi le titre de « plus désirable » et pourquoi ?",
+    "Quelle image de toi aimerais-tu laisser dans la tête de la personne de ton choix ?",
+    "Quelle est ta technique infaillible pour séduire sans parler ?",
+    "Quel est le geste anodin qui te trouble le plus chez quelqu'un ?",
+    "Quel est le fantasme que tu aimerais réaliser avant la fin de l'année ?",
+    "Quelle tenue chez quelqu'un te fait immédiatement tourner la tête ?",
+    "Quel est le moment de la journée où tu te sens le plus désirable ?",
+    "Quelle est la première chose que tu remarques chez quelqu'un en le voyant arriver ?",
+    "Quel est le film ou la scène qui t'a donné envie de jouer à ce genre de jeu ?",
+    "Quelle est ta limite absolue, celle que personne ne doit franchir ce soir ?",
+    "Quel est le mot ou la phrase qui te fait instantanément rougir ?",
+    "Quelle partie de ta personnalité devient irrésistible quand tu es en confiance ?",
+    "Quel secret inoffensif sur toi ferait le plus rire ce groupe ?",
+    "Quelle est la chose que tu fais machinalement quand tu dragues ?",
+    "Quel est ton pire tic quand quelqu'un te plaît ?",
+    "Quel joueur ici a, selon toi, le regard le plus intense ?",
+    "Quelle est la question que tu n'oses jamais poser de peur de la réponse ?",
+    "Quel est le souvenir qui te fait encore frissonner quand tu y penses ?",
+    "Qui embrasse le mieux selon les rumeurs, et crois-tu que ce soit vrai ?",
+    "Quelle est la musique sur laquelle tu ne peux pas t'empêcher de danser sensuellement ?",
+    "Quel est le parfum ou l'odeur qui te rend complètement faible ?",
+    "Quelle est ta plus grande qualité en matière de séduction, selon toi ?",
+    "Quel défaut trouves-tu au contraire incroyablement charmant chez les autres ?",
+    "Qui est la personne de ce groupe que tu choisirais comme partenaire de danse et pourquoi ?",
+    "Quelle est la chose la plus coquine que tu aies dite par accident ?",
+    "Quel est le rendez-vous parfait selon toi, de A à Z ?",
+    "Quelle est la première chose que tu ferais après cette soirée si tout était permis ?",
+    "Quel est ton signe de drague le plus discret ?",
+    "Qui te connaît le mieux ici, et que sait-il/elle de toi ?",
+    "Quelle est ta réaction si la personne de ton choix te fixe sans un mot ?",
+    "Quel est le plus beau compliment qu'on t'ait fait sur ton corps ?",
+    "Quelle est la partie de toi que tu trouves la plus sous-estimée ?",
+    "Quel est ton souvenir de vacances le plus chaud ?",
+    "Qui dans ce groupe te ferait le plus rougir avec un simple regard ?",
+    "Quelle est la règle que tu aimerais inventer pour ce jeu ce soir ?",
+    "Quel est le défi que tu espères ne jamais recevoir ?",
+    "Quelle est la chose que tu as toujours voulu essayer sans jamais l'avouer ?",
+    "Quel est le type de regard qui te fait le plus d'effet ?",
+    "Qui choisirais-tu pour t'aider à retirer un vêtement, si le jeu l'exigeait ?",
+    "Quelle est la tenue que tu rêves de voir sur la personne de ton choix ?",
+    "Quel est le plus gros mensonge que tu aies dit pour impressionner quelqu'un ?",
+    "Quelle est ta façon préférée de briser la glace avec quelqu'un qui te plaît ?",
+    "Quel est l'accessoire ou le vêtement qui te donne un maximum de confiance ?",
+    "Qui ici dégagerait le plus de charme selon toi, et pourquoi ?",
+    "Quelle est la chose la plus spontanée que tu aies faite par désir ?",
+    "Quel est ton point faible : le regard, la voix ou les mains ?",
+    "Quelle est la scène que tu aimerais rejouer avec quelqu'un de ce groupe ?",
+    "Quel est le moment où tu t'es senti(e) le plus désiré(e) de ta vie ?",
+    "Qui dans cette pièce est le plus difficile à décoder, selon toi ?",
+    "Quelle est la chose que tu aimerais qu'on t'avoue ce soir ?",
+    "Quel est ton plus beau souvenir lié à un baiser ?",
+    "Quelle est ta définition du charme, en trois mots ?",
+    "Quel est le compliment que tu gardes précieusement en mémoire ?",
+    "Qui choisirais-tu pour t'écrire une lettre d'amour torride ?",
+    "Quelle est la partie de ton corps que tu aimerais qu'on redécouvre ?",
+    "Quel est le moment idéal pour un premier baiser, selon toi ?",
+    "Quelle est la chose que tu trouves sexy chez toi sans l'avouer ?",
+    "Qui dans ce groupe a le sourire le plus envoûtant ?",
+    "Quelle est la plus grosse bêtise que tu aies faite pour quelqu'un qui te plaisait ?",
+    "Quel est ton langage de l'amour préféré : les mots, les gestes ou les attentions ?",
+    "Quelle est la phrase que tu aimerais entendre juste avant qu'on t'embrasse ?",
+    "Qui ici serait le plus surprenant en tête-à-tête, selon toi ?",
+    "Quelle est la chose que tu observes en premier chez quelqu'un qui danse ?",
+    "Quel est le rêve le plus osé que tu aies fait à propos de quelqu'un d'ici ?",
+    "Quelle est la qualité que tu recherches avant de laisser quelqu'un s'approcher ?",
+    "Qui choisirais-tu pour un massage de trente minutes, sans hésiter ?",
+    "Quelle est la chose que tu n'as jamais osé demander à personne ?",
+    "Quel est le baiser dont tu te souviendras toute ta vie ?",
+]
+
+truth_candidates = []
+for z in ZQ:
+    truth_candidates.append(f"Quelle est la chose que tu préfères qu'on te fasse à {z} ?")
+for s in SQ:
+    truth_candidates.append(f"Décris ce que tu ressens quand quelqu'un {s}.")
+for p in P:
+    for z in ZKISS:
+        truth_candidates.append(f"Quelle serait ta réaction si {p} t'embrassait {z} ?")
+    for z in ZMASS:
+        truth_candidates.append(f"Décris l'effet que te ferait un massage de {z} par {p}.")
+    for z in ZSOUFFLE:
+        truth_candidates.append(f"Comment réagirais-tu si {p} te soufflait dans {z} sans prévenir ?")
+truth_candidates += AT + QC + QE + TD + SI + QR
+truth_candidates = [fix(t) for t in truth_candidates]
+
+new_truths = dedup(truth_candidates, existing_texts)
+random.shuffle(new_truths)
+new_truths = new_truths[:448]
+
+# ----------------------------------------------------------------------
+# 4bis) 2000 cartes HARDCORE (1160 actions + 840 vérités) — niveau brulant
+# ----------------------------------------------------------------------
+HZ = [
+    "le cou", "la nuque", "la clavicule", "les seins", "le torse", "le ventre",
+    "le nombril", "les hanches", "le bas du dos", "les fesses",
+    "l'intérieur des cuisses", "les cuisses", "le creux du genou", "la cheville",
+    "le lobe de l'oreille", "l'intérieur du poignet",
+]
+HSZ = ["les fesses", "l'arrière des cuisses"]
+HD = ["15 secondes", "30 secondes", "1 minute", "2 minutes", "3 minutes"]
+
+hard_action_candidates = []
+for p in P:
+    for z in HZ:
+        for d in HD:
+            hard_action_candidates.append(f"Attache les poignets de {p} dans le dos avec une ceinture, puis caresse {z} de haut en bas pendant {d}.")
+            hard_action_candidates.append(f"Tire doucement les cheveux de {p} tout en lui embrassant {z} pendant {d}.")
+            hard_action_candidates.append(f"Glisse ta main sous le vêtement de {p} jusqu'à {z}, et arrête-toi juste avant, pendant {d}.")
+            hard_action_candidates.append(f"Chuchote à {p} le scénario le plus hard que tu oserais vivre, en lui mordillant {z} pendant {d}.")
+            hard_action_candidates.append(f"Fais un body shot sur {z} de {p} : sel, shot, citron, et récupère le tout avec ta langue pendant {d}.")
+            hard_action_candidates.append(f"Embrasse {z} de {p} en y laissant un suçon bien visible pendant {d}.")
+    for z in HZ:
+        hard_action_candidates.append(f"Bande les yeux de {p}, fais-lui goûter trois aliments, puis lèche {z} pour le dessert.")
+        hard_action_candidates.append(f"Trace un mot coquin avec ta langue sur {z} de {p}, qui doit le deviner sans regarder.")
+    for z in HSZ:
+        hard_action_candidates.append(f"Donne trois claques légères sur {z} de {p}, avec son accord, en comptant à voix haute.")
+    hard_action_candidates.append(f"Assois-toi à califourchon sur {p} et fais-lui un lap dance de 2 minutes sans le toucher avec les mains.")
+    hard_action_candidates.append(f"Enlève un vêtement de {p} avec les dents uniquement.")
+    hard_action_candidates.append(f"Fais porter à {p} un bandeau sur les yeux pendant deux tours, puis guide ses mains sur ton corps.")
+
+hard_action_candidates += [
+    "Fais un strip-tease jusqu'aux sous-vêtements devant tout le groupe, en musique.",
+    "Laisse la personne la plus proche de toi te faire un suçon où elle veut, tant qu'il est caché.",
+    "Refais ton lit de façon suggestive, à quatre pattes, pendant que le groupe te regarde.",
+    "Échange ton haut avec quelqu'un qui accepte, dos à dos, sans regarder.",
+    "Garde les mains attachées derrière le dos pendant deux tours.",
+    "Fais deviner une position coquine en la mimant au sol, sans un mot.",
+    "Récite l'alphabet en embrassant une zone différente de la personne de ton choix à chaque lettre.",
+    "Fais un câlin collé-serré de 2 minutes à la personne de ton choix, en respirant fort dans son cou.",
+    "Laisse la personne de ton choix t'écrire un mot au feutre quelque part sous tes vêtements.",
+    "Fais un massage intégral des pieds à la tête à la personne de ton choix, pendant 5 minutes.",
+    "Mime la scène de ton fantasme préféré avec la personne de ton choix, sans la toucher.",
+    "Reste assis sur les genoux de quelqu'un qui accepte pendant tout le tour suivant.",
+    "Laisse quelqu'un qui accepte t'attacher les chevilles avec une écharpe pendant un tour.",
+    "Fais un exercice de respiration très bruyant en gardant le contact visuel avec la personne en face de toi.",
+    "Chuchote à l'oreille de la personne à ta gauche trois choses que tu aimerais qu'on te fasse.",
+    "Fais un massage du crâne à la personne à ta droite en lui tirant très doucement les cheveux.",
+    "Laisse la personne de ton choix poser une main n'importe où sur toi pendant 20 secondes, au-dessus des vêtements.",
+    "Fais un effeuillage symbolique : retire trois accessoires lentement, avec le regard fixe.",
+    "Bois un shot sur le nombril de quelqu'un qui accepte.",
+    "Fais goûter un glaçon à la personne de ton choix uniquement avec ta bouche.",
+    "Raconte à voix haute, en détail, ce que tu ferais si tu gagnais une nuit entière avec la personne de ton choix.",
+    "Fais tenir une position de gaine pendant que quelqu'un qui accepte te fait un massage des épaules.",
+    "Demande à la personne de ton choix de t'attacher un bandeau, puis laisse-la te faire deviner un objet.",
+    "Imite le bruit le plus suggestif possible pendant 10 secondes, sans rire.",
+]
+hard_action_candidates = [fix(t) for t in hard_action_candidates]
+
+hard_truth_candidates = []
+for p in P:
+    for z in HZ:
+        hard_truth_candidates.append(f"Quelle serait ta réaction si {p} te léchait {z} sans prévenir ?")
+        hard_truth_candidates.append(f"Décris exactement comment {p} devrait te toucher {z} pour te faire perdre la tête.")
+        hard_truth_candidates.append(f"Préférerais-tu que {p} te morde, te lèche ou te caresse {z} ?")
+        hard_truth_candidates.append(f"Quel mot aimerais-tu que {p} t'écrive avec sa langue sur {z} ?")
+        for d in HD:
+            hard_truth_candidates.append(f"Décris ce que tu ressentirais si {p} te maintenait contre le mur en te léchant {z} pendant {d}.")
+            hard_truth_candidates.append(f"Raconte un souvenir, réel ou rêvé, où {p} t'embrassait {z} pendant {d}.")
+    hard_truth_candidates.append(f"Si tu pouvais attacher {p} pendant une heure, que ferais-tu de lui/elle ?")
+    hard_truth_candidates.append(f"Quelle fessée mériterais-tu de la part de {p}, et avec quoi ?")
+    hard_truth_candidates.append(f"Si {p} te bandait les yeux, qu'espérerais-tu qu'il/elle te fasse ensuite ?")
+    hard_truth_candidates.append(f"Quel est le scénario le plus hard que tu imaginerais avec {p} ?")
+
+hard_truth_candidates += [
+    "Quel est le fantasme le plus extrême que tu n'as jamais osé dire à voix haute ?",
+    "Quelle est la chose la plus hard que tu aies faite avec un(e) partenaire ?",
+    "As-tu déjà utilisé des menottes, un bandeau ou une ceinture ? Raconte.",
+    "Quelle est ta position préférée, et pourquoi ?",
+    "As-tu déjà eu une relation purement physique ? Comment c'était ?",
+    "Quel est le compliment le plus cru qu'on puisse te faire au lit ?",
+    "As-tu déjà fait l'amour dans un endroit risqué ? Où ?",
+    "Quelle est la partie du corps de quelqu'un ici que tu aimerais le plus mordiller ?",
+    "Quel mot prononcé à voix basse te fait le plus d'effet ?",
+    "As-tu déjà laissé une marque (suçon, griffure) ou reçu une marque ? Où ?",
+    "Quelle est ta limite absolue au lit, celle que tu ne franchiras jamais ?",
+    "As-tu déjà dominé quelqu'un, ou été dominé(e) ? Raconte.",
+    "Quel est ton sextoy ou accessoire préféré, si tu en as un ?",
+    "Quel est le bruit que tu fais quand tu es vraiment excité(e) ?",
+    "As-tu déjà filmé ou pris en photo un moment intime ?",
+    "Quelle partie de ton corps réagit la première quand tu es excité(e) ?",
+    "Quel est le lieu le plus excitant où tu rêverais de le faire ?",
+    "As-tu déjà eu envie de quelqu'un d'ici pendant le jeu ?",
+    "Quelle est la chose que tu ne supportes pas au lit ?",
+    "Quel est le plus long moment sans contact physique que tu aies tenu ?",
+    "As-tu déjà été attrapé(e) en pleine action ? Raconte.",
+    "Quel est le scénario de jeu de rôle qui t'excite le plus ?",
+    "Quelle est la partie la plus sensible de ton corps, celle que tu caches ?",
+    "As-tu déjà fait le premier pas de façon très directe ? Comment ?",
+    "Quel est le souvenir le plus hard de ta vie ?",
+    "Qu'est-ce qui te fait le plus craquer : la domination ou la douceur ?",
+    "As-tu déjà dit un mot interdit pendant l'acte ? Lequel ?",
+    "Quel est le fantasme que tu aimerais réaliser avec quelqu'un d'ici ?",
+    "Quelle est la chose que tu aimerais qu'on te fasse sans que tu aies à le demander ?",
+    "As-tu déjà eu un coup de foudre purement physique ?",
+]
+hard_truth_candidates = [fix(t) for t in hard_truth_candidates]
+
+used = set(existing_texts) | set(new_actions) | set(new_truths)
+hard_actions = dedup(hard_action_candidates, used)
+random.shuffle(hard_actions)
+hard_actions = hard_actions[:1160]
+
+used |= set(hard_actions)
+hard_truths = dedup(hard_truth_candidates, used)
+random.shuffle(hard_truths)
+hard_truths = hard_truths[:840]
+
+# ----------------------------------------------------------------------
+# 5) Assemblage final : 436 + 1064 + 2000 = 3500
+# ----------------------------------------------------------------------
+cards, cid = [], 1
+for d in src:  # les 436 d'origine
+    text = d["text"]
+    if TYPE[d["type"]] == "dare":
+        text = opposite_sex(text)
+    cards.append({"id": cid, "type": TYPE[d["type"]], "level": "brulant", "text": text})
+    cid += 1
+for t in new_actions:
+    cards.append({"id": cid, "type": "dare", "level": "brulant", "text": opposite_sex(t)})
+    cid += 1
+for t in new_truths:
+    cards.append({"id": cid, "type": "truth", "level": "brulant", "text": t})
+    cid += 1
+for t in hard_actions:
+    cards.append({"id": cid, "type": "dare", "level": "brulant", "text": opposite_sex(t)})
+    cid += 1
+for t in hard_truths:
+    cards.append({"id": cid, "type": "truth", "level": "brulant", "text": t})
+    cid += 1
+
+texts = [c["text"] for c in cards]
+assert len(texts) == len(set(texts)) == 3500, "Doublons détectés !"
+assert len(new_actions) == 616 and len(new_truths) == 448, "Comptage erroné"
+assert len(hard_actions) == 1160 and len(hard_truths) == 840, "Comptage hardcore erroné"
+
+print("Total cartes :", len(cards))
+from collections import Counter
+cnt = Counter((c["level"], c["type"]) for c in cards)
+for k in sorted(cnt):
+    print("  ", k, "->", cnt[k])
+
+json.dump(cards, open("cards.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+print("cards.json écrit (3500 cartes)")
+
+# ----------------------------------------------------------------------
+# 6) SQL
+# ----------------------------------------------------------------------
+def esc(s):
+    return s.replace("'", "''")
+
+insert_block = "insert into public.cards (type, level, text) values\n" + ",\n".join(
+    "('%s', '%s', '%s')" % (c["type"], c["level"], esc(c["text"])) for c in cards
+) + ";"
+
+HEADER = """-- =====================================================================
+--  ACTION OU VERITE -- BACKEND SUPABASE COMPLET (fichier unique)
+--  3500 cartes niveau "brulant" (436 d'origine + 1064 brûlant + 2000 hardcore)
+--  Supabase -> SQL Editor -> New query -> coller tout -> RUN
+-- =====================================================================
+
+create extension if not exists pgcrypto;
+
+create table if not exists public.cards (
+  id        bigint generated by default as identity primary key,
+  type      text not null check (type in ('truth', 'dare')),
+  level     text not null check (level in ('brulant')),
+  text      text not null,
+  is_used   boolean not null default false,
+  last_used timestamptz
+);
+create index if not exists cards_level_type_idx on public.cards (level, type);
+
+create table if not exists public.players (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null,
+  score      integer not null default 0,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.history (
+  id          bigint generated by default as identity primary key,
+  player_id   uuid references public.players(id) on delete set null,
+  player_name text,
+  type        text,
+  text        text,
+  done        boolean not null default false,
+  level       text,
+  created_at  timestamptz not null default now()
+);
+create index if not exists history_id_idx on public.history (id desc);
+
+alter table public.cards    enable row level security;
+alter table public.players  enable row level security;
+alter table public.history  enable row level security;
+
+drop policy if exists "cards_public_read" on public.cards;
+create policy "cards_public_read" on public.cards for select using (true);
+
+drop policy if exists "players_anon_all" on public.players;
+create policy "players_anon_all" on public.players for all using (true) with check (true);
+
+drop policy if exists "history_anon_all" on public.history;
+create policy "history_anon_all" on public.history for all using (true) with check (true);
+
+create or replace function public.draw_card(p_type text, p_level text)
+returns public.cards
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+declare
+  picked public.cards%rowtype;
+begin
+  if p_type not in ('truth','dare') or p_level not in ('brulant') then
+    raise exception 'type ou niveau invalide';
+  end if;
+
+  select * into picked
+    from public.cards
+   where type = p_type and level = p_level and is_used is not true
+   order by random()
+   limit 1;
+
+  if picked.id is null then
+    update public.cards set is_used = false, last_used = null
+     where type = p_type and level = p_level;
+    select * into picked
+      from public.cards
+     where type = p_type and level = p_level and is_used is not true
+     order by random()
+     limit 1;
+  end if;
+
+  update public.cards set is_used = true, last_used = now() where id = picked.id;
+  return picked;
+end;
+$fn$;
+
+create or replace function public.stats()
+returns jsonb
+language sql
+security definer
+set search_path = public
+stable
+as $fn$
+  select jsonb_build_object(
+    'players', (select count(*) from public.players),
+    'cards',   (select count(*) from public.cards),
+    'history', (select count(*) from public.history),
+    'remaining', (
+      select coalesce(jsonb_object_agg(level, per_level), '{}'::jsonb) from (
+        select level,
+               jsonb_build_object(
+                 'truth', count(*) filter (where type = 'truth' and is_used is not true),
+                 'dare',  count(*) filter (where type = 'dare'  and is_used is not true)
+               ) as per_level
+          from public.cards
+         group by level
+      ) t
+    )
+  );
+$fn$;
+
+create or replace function public.reset_game()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+begin
+  update public.players set score = 0 where score <> 0;
+  delete from public.history where id > 0;
+  update public.cards set is_used = false, last_used = null where is_used = true;
+end;
+$fn$;
+
+create or replace function public.clear_history()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+begin
+  delete from public.history where id > 0;
+end;
+$fn$;
+
+grant usage on schema public to anon, authenticated;
+grant select on public.cards to anon, authenticated;
+grant select, insert, update, delete on public.players to anon, authenticated;
+grant select, insert, update, delete on public.history to anon, authenticated;
+grant usage, select on all sequences in schema public to anon, authenticated;
+
+grant execute on function public.draw_card(text, text) to anon, authenticated;
+grant execute on function public.stats() to anon, authenticated;
+grant execute on function public.reset_game() to anon, authenticated;
+grant execute on function public.clear_history() to anon, authenticated;
+
+do $seed$
+begin
+  if (select count(*) from public.cards) = 0 then
+"""
+
+FOOTER = """  end if;
+end
+$seed$;
+"""
+
+with open("supabase.sql", "w", encoding="utf-8") as f:
+    f.write(HEADER + "    " + insert_block.replace("\n", "\n    ") + "\n" + FOOTER)
+
+MIGRATION = """-- =====================================================================
+--  MIGRATION : 3500 cartes "brulant" (436 d'origine + 1064 brûlant + 2000 hardcore)
+--  Supabase -> SQL Editor -> New query -> coller tout -> RUN
+-- =====================================================================
+begin;
+
+drop table if exists public.cards cascade;
+
+create table public.cards (
+  id        bigint generated by default as identity primary key,
+  type      text not null check (type in ('truth', 'dare')),
+  level     text not null check (level in ('brulant')),
+  text      text not null,
+  is_used   boolean not null default false,
+  last_used timestamptz
+);
+create index cards_level_type_idx on public.cards (level, type);
+
+alter table public.cards enable row level security;
+drop policy if exists "cards_public_read" on public.cards;
+create policy "cards_public_read" on public.cards for select using (true);
+grant select on public.cards to anon, authenticated;
+
+""" + insert_block + """
+
+create or replace function public.draw_card(p_type text, p_level text)
+returns public.cards
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+declare
+  picked public.cards%rowtype;
+begin
+  if p_type not in ('truth','dare') or p_level not in ('brulant') then
+    raise exception 'type ou niveau invalide';
+  end if;
+
+  select * into picked
+    from public.cards
+   where type = p_type and level = p_level and is_used is not true
+   order by random()
+   limit 1;
+
+  if picked.id is null then
+    update public.cards set is_used = false, last_used = null
+     where type = p_type and level = p_level;
+    select * into picked
+      from public.cards
+     where type = p_type and level = p_level and is_used is not true
+     order by random()
+     limit 1;
+  end if;
+
+  update public.cards set is_used = true, last_used = now() where id = picked.id;
+  return picked;
+end;
+$fn$;
+
+create or replace function public.reset_game()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+begin
+  update public.players set score = 0 where score <> 0;
+  delete from public.history where id > 0;
+  update public.cards set is_used = false, last_used = null where is_used = true;
+end;
+$fn$;
+
+create or replace function public.clear_history()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+begin
+  delete from public.history where id > 0;
+end;
+$fn$;
+
+grant execute on function public.draw_card(text, text) to anon, authenticated;
+grant execute on function public.reset_game() to anon, authenticated;
+grant execute on function public.clear_history() to anon, authenticated;
+
+commit;
+"""
+
+with open("migration_cards.sql", "w", encoding="utf-8") as f:
+    f.write(MIGRATION)
+
+print("supabase.sql + migration_cards.sql écrits")
+
+# échantillons
+print("\nÉchantillon nouvelles actions :")
+for t in new_actions[:6]:
+    print("  ", opposite_sex(t))
+print("Échantillon nouvelles vérités :")
+for t in new_truths[:6]:
+    print("  ", t)
+print("\nÉchantillon hardcore actions :")
+for t in hard_actions[:4]:
+    print("  ", opposite_sex(t))
+print("Échantillon hardcore vérités :")
+for t in hard_truths[:4]:
+    print("  ", t)

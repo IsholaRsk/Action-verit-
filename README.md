@@ -1,0 +1,57 @@
+# Action ou Vérité — Édition Premium
+
+Jeu d'ambiance adulte connecté à Supabase, avec **3500 défis (Brûlant + Hardcore)**.
+
+## Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `index.html` | Application complète (thème sombre/clair/auto, 5 palettes, glassmorphism, icônes SVG, navigation basse) |
+| `supabase.sql` | Backend complet **pour une base neuve** (3500 cartes, tables, RLS, fonctions RPC) |
+| `migration_cards.sql` | **Migration** : remplace les cartes existantes par les 3500 (à exécuter si un ancien script a déjà tourné) |
+| `cards.json` | Les 3500 cartes au format JSON (données brutes) |
+| `generate_extra.py` | Générateur des 3064 cartes supplémentaires (1064 brûlant + 2000 hardcore, relançable) |
+
+## Les 3500 cartes
+
+- **Niveau unique** : `brulant` (Brûlant) — aucune sélection de mode dans l'app.
+- **Types** : `truth` = 1472 vérités · `dare` = 2028 actions.
+- Composition : **436 cartes du fichier « Json a ou v »** + **1064 nouvelles brûlant** + **2000 nouvelles hardcore**.
+- Les **actions** visent toujours une personne **du sexe opposé**.
+- Format : `{ "id", "type", "level", "text" }` — `verite → truth`, `action → dare`.
+
+## Mise en route
+
+### 1) Base de données (une seule fois)
+Dans Supabase → **SQL Editor → New query** :
+- **Base neuve** → colle tout `supabase.sql` → Run.
+- **Base existante** → colle tout `migration_cards.sql` → Run.
+
+### 2) Frontend
+La connexion est déjà configurée dans `index.html` :
+```js
+const SUPABASE = {
+  url: "https://ljdzkuielhiytrzwhave.supabase.co",
+  key: "sb_publishable_vitVztwFe95ZWC9eR_s_mw_kTHd7wjK"
+};
+```
+Déployez `index.html` (Netlify, Vercel, GitHub Pages…) ou ouvrez-le localement.
+
+## RPC disponibles (appels depuis l'app)
+
+| Fonction | Méthode | Corps |
+|---|---|---|
+| `draw_card` | `POST /rest/v1/rpc/draw_card` | `{ "p_type": "truth", "p_level": "brulant" }` |
+| `stats` | `POST /rest/v1/rpc/stats` | `{}` |
+| `reset_game` | `POST /rest/v1/rpc/reset_game` | `{}` |
+| `clear_history` | `POST /rest/v1/rpc/clear_history` | `{}` |
+
+Tables REST : `GET/POST/PATCH/DELETE /rest/v1/players`, `GET /rest/v1/history?select=*&order=id.desc&limit=200`.
+
+## Thème & palettes
+
+- **Palette par défaut** : **Hot** 🔥 (rouge / or / violet sur fond quasi noir, titre en serif, scanlines + particules, portail 18+).
+- **Autres palettes** : Aurora, Émeraude, Océan, Coucher de soleil — Réglages → Palette de couleurs.
+- **Thème** : sombre, clair ou automatique (suit l'appareil) — bouton lune/soleil en haut, ou Réglages.
+- **Portail adulte** : à l'ouverture, un écran « Adultes uniquement » s'affiche (accepté = mémorisé pour la session).
+- Choix mémorisés dans `localStorage`.
