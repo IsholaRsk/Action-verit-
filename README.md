@@ -37,6 +37,14 @@ const SUPABASE = {
 ```
 Déployez `index.html` (Netlify, Vercel, GitHub Pages…) ou ouvrez-le localement.
 
+## Comptes & défis personnels
+
+- **Créer un compte** : nom d'utilisateur + **mot de passe OU code PIN (4 chiffres)**.
+- **Se connecter** : même chose — mot de passe ou PIN, au choix.
+- Une fois connecté, on peut **ajouter un défi** (Action / Vérité) ou **importer un fichier** (`.json` ou `.txt`, un défi par ligne, préfixe `action:` / `verite:` optionnel).
+- Ces défis sont **sauvegardés uniquement sur le compte** (table `user_cards`, accès par token de session).
+- Option « **Inclure mes défis dans la partie** » : le jeu pioche alors aussi parmi les défis personnels du compte connecté.
+
 ## RPC disponibles (appels depuis l'app)
 
 | Fonction | Méthode | Corps |
@@ -45,8 +53,17 @@ Déployez `index.html` (Netlify, Vercel, GitHub Pages…) ou ouvrez-le localemen
 | `stats` | `POST /rest/v1/rpc/stats` | `{}` |
 | `reset_game` | `POST /rest/v1/rpc/reset_game` | `{}` |
 | `clear_history` | `POST /rest/v1/rpc/clear_history` | `{}` |
+| `sign_up` | `POST /rest/v1/rpc/sign_up` | `{ "p_username", "p_password", "p_pin" }` |
+| `sign_in` | `POST /rest/v1/rpc/sign_in` | `{ "p_username", "p_password", "p_pin" }` |
+| `sign_out` | `POST /rest/v1/rpc/sign_out` | `{ "p_token" }` |
+| `me` | `POST /rest/v1/rpc/me` | `{ "p_token" }` |
+| `add_card` | `POST /rest/v1/rpc/add_card` | `{ "p_token", "p_type", "p_text" }` |
+| `import_cards` | `POST /rest/v1/rpc/import_cards` | `{ "p_token", "p_cards": [{ "type", "text" }] }` |
+| `my_cards` | `POST /rest/v1/rpc/my_cards` | `{ "p_token" }` |
+| `delete_card` | `POST /rest/v1/rpc/delete_card` | `{ "p_token", "p_card_id" }` |
 
 Tables REST : `GET/POST/PATCH/DELETE /rest/v1/players`, `GET /rest/v1/history?select=*&order=id.desc&limit=200`.
+Les mots de passe / PIN sont **hachés** (bcrypt via pgcrypto) ; les tables `accounts` / `sessions` / `user_cards` sont en RLS sans politique (accès uniquement via les RPC).
 
 ## Thème & palettes
 

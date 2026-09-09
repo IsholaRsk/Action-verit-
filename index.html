@@ -404,6 +404,17 @@
   .btn.small{padding:10px;font-size:13px;border-radius:12px}
 
   .hint{font-size:12px;color:var(--muted);margin-top:12px;text-align:center;line-height:1.5}
+  textarea.input{resize:vertical;min-height:96px;line-height:1.55;font-family:inherit}
+  input[type="file"].input{padding:10px 12px;font-size:13px}
+  .acc-badge{display:inline-flex;align-items:center;gap:9px;font-weight:800;font-size:15px}
+  .acc-badge .ic{width:20px;height:20px;color:var(--accent)}
+  .drow{display:flex;gap:10px;align-items:flex-start;padding:11px 6px;border-bottom:1px solid var(--glass-brd-soft);font-size:13.5px;line-height:1.45;color:var(--ink-2)}
+  .drow:last-child{border-bottom:none}
+  .drow .dtag{flex:none;font-size:9.5px;letter-spacing:1.1px;text-transform:uppercase;font-weight:800;padding:3px 8px;border-radius:20px;margin-top:2px}
+  .drow .dtag.truth{background:var(--truth-soft);color:var(--truth)}
+  .drow .dtag.dare{background:var(--dare-soft);color:var(--dare)}
+  .drow .dtext{flex:1;min-width:0;word-break:break-word}
+  .drow .ddel{width:34px;height:34px;flex:none}
   .cards-left{display:flex;justify-content:center;gap:14px;margin-top:14px;font-size:12px;color:var(--muted);font-weight:600}
   .cards-left span{display:flex;align-items:center;gap:6px}
   .cards-left .ic{width:15px;height:15px}
@@ -698,6 +709,74 @@
         <div class="glass-panel" id="history-body"></div>
       </section>
 
+      <!-- ============ COMPTE & DÉFIS PERSONNELS ============ -->
+      <section class="view" id="view-defis">
+        <div class="section-title"><span data-icon="user"></span>Mon compte</div>
+
+        <!-- Non connecté -->
+        <div id="auth-box">
+          <div class="glass-panel">
+            <div class="seg cols2" id="auth-tabs">
+              <button data-t="login" class="sel">Connexion</button>
+              <button data-t="signup">Créer un compte</button>
+            </div>
+            <label class="lbl">Nom d'utilisateur</label>
+            <input class="input" id="auth-username" maxlength="20" placeholder="ex. ludo" autocomplete="username">
+            <label class="lbl">Mot de passe</label>
+            <input class="input" id="auth-password" type="password" placeholder="••••••" autocomplete="current-password">
+            <label class="lbl">Code PIN (4 chiffres)</label>
+            <input class="input" id="auth-pin" type="text" inputmode="numeric" maxlength="4" placeholder="0000" autocomplete="off">
+            <p class="hint">Renseignez le mot de passe <b>ou</b> le code PIN — l'un des deux suffit.</p>
+            <button class="btn btn-primary" id="auth-submit" style="margin-top:14px"><span data-icon="user"></span>Se connecter</button>
+            <p class="hint" id="auth-msg"></p>
+          </div>
+        </div>
+
+        <!-- Connecté -->
+        <div id="defis-box" style="display:none">
+          <div class="glass-panel">
+            <div class="setting-row" style="border-bottom:none">
+              <div class="txt"><b><span class="acc-badge"><span data-icon="user"></span><span id="acc-name">—</span></span></b><span>Vos défis sont sauvegardés uniquement sur ce compte</span></div>
+              <button class="btn btn-ghost small" id="btn-logout" style="width:auto"><span data-icon="logout"></span>Déconnexion</button>
+            </div>
+          </div>
+
+          <div class="glass-panel">
+            <label class="lbl" style="margin-top:0">Ajouter un défi</label>
+            <div class="seg cols2" id="defi-type-seg">
+              <button data-t="dare" class="sel">Action</button>
+              <button data-t="truth">Vérité</button>
+            </div>
+            <textarea class="input" id="defi-text" rows="3" maxlength="400" placeholder="Écrivez votre défi…" style="margin-top:10px"></textarea>
+            <button class="btn btn-primary" id="btn-add-defi" style="margin-top:12px"><span data-icon="plus"></span>Ajouter à mes défis</button>
+          </div>
+
+          <div class="glass-panel">
+            <label class="lbl" style="margin-top:0">Importer un fichier de défis</label>
+            <p class="hint" style="text-align:left;margin:0 0 10px">Formats acceptés : <b>.json</b> (liste de textes ou d'objets <b>{text, type}</b>) ou <b>.txt</b> (un défi par ligne, préfixe « action: » / « verite: » optionnel).</p>
+            <div class="seg cols2" id="import-type-seg">
+              <button data-t="dare" class="sel">Défaut : Action</button>
+              <button data-t="truth">Défaut : Vérité</button>
+            </div>
+            <input type="file" id="import-file" accept=".json,.txt,.csv" class="input" style="margin-top:10px">
+            <button class="btn btn-ghost small" id="btn-import" style="margin-top:12px"><span data-icon="upload"></span>Importer</button>
+            <p class="hint" id="import-msg"></p>
+          </div>
+
+          <div class="glass-panel">
+            <div class="setting-row" style="border-bottom:none">
+              <div class="txt"><b>Inclure mes défis dans la partie</b><span>Le jeu pourra aussi piocher parmi vos défis personnels</span></div>
+              <button class="switch on" id="switch-personal" aria-label="Défis personnels"></button>
+            </div>
+          </div>
+
+          <div class="glass-panel">
+            <label class="lbl" style="margin-top:0">Mes défis (<span id="mycount">0</span>)</label>
+            <div id="mycards-list"></div>
+          </div>
+        </div>
+      </section>
+
       <!-- ============ RÉGLAGES ============ -->
       <section class="view" id="view-settings">
         <div class="section-title"><span data-icon="sliders"></span>Réglages</div>
@@ -748,6 +827,7 @@
     <button class="nav-item" data-view="game"><span data-icon="play"></span><span>Jouer</span></button>
     <button class="nav-item" data-view="scores"><span data-icon="trophy"></span><span>Scores</span></button>
     <button class="nav-item" data-view="history"><span data-icon="clock"></span><span>Historique</span></button>
+    <button class="nav-item" data-view="defis"><span data-icon="user"></span><span>Défis</span></button>
     <button class="nav-item" data-view="settings"><span data-icon="sliders"></span><span>Réglages</span></button>
   </nav>
 
@@ -785,6 +865,9 @@ const ICONS = {
   'volume-x': '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/>',
   refresh: '<polyline points="23 4 23 10 17 10"/><path d="M20.5 15a9 9 0 1 1-2.1-9.4L23 10"/>',
   shuffle: '<polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/><line x1="4" y1="4" x2="9" y2="9"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"/>',
+  upload: '<path d="M12 16V4"/><polyline points="7 9 12 4 17 9"/><path d="M4 16v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/>',
+  logout: '<path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>',
   database: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>',
   bolt: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
   sparkle: '<path d="M12 3l2.1 5.7 5.7 2.1-5.7 2.1L12 18.6l-2.1-5.7L4.2 10.8l5.7-2.1z" fill="currentColor" stroke="none"/><path d="M19 14.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" fill="currentColor" stroke="none"/>',
@@ -817,7 +900,15 @@ const app = {
   type: null,
   cardText: null,
   resolved: false,
-  dbOk: false
+  dbOk: false,
+  token: safeGet("aov-token") || null,
+  username: safeGet("aov-username") || null,
+  accountId: safeGet("aov-account") || null,
+  myCards: [],
+  includePersonal: safeGet("aov-personal") !== "off",
+  defiType: "dare",
+  importType: "dare",
+  authMode: "login"
 };
 
 /* ===================== PALETTES ===================== */
@@ -1100,6 +1191,13 @@ function runShuffle(token){
 }
 
 async function drawCard(type){
+  // Défis personnels du compte (si connecté + option activée)
+  if(app.includePersonal && app.token && app.myCards && app.myCards.length){
+    const pool = app.myCards.filter(c => c.type === type);
+    if(pool.length && Math.random() < 0.4){
+      return { text: pool[Math.floor(Math.random() * pool.length)].text, source: "personal" };
+    }
+  }
   try{
     return await rpc("draw_card", { p_type: type, p_level: app.level });
   }catch(e){
@@ -1281,6 +1379,7 @@ function bindNav(){
       if(v === "scores") renderScores();
       if(v === "history") renderHistory();
       if(v === "settings") renderSettings();
+      if(v === "defis") renderDefis();
       if(v === "home") updateCardsLeft();
     });
   });
@@ -1385,6 +1484,168 @@ function bindSettings(){
   });
 }
 
+/* ===================== COMPTE & DÉFIS PERSONNELS ===================== */
+function setSession(o){
+  app.token = o.token; app.username = o.username; app.accountId = o.account_id;
+  safeSet("aov-token", o.token); safeSet("aov-username", o.username); safeSet("aov-account", String(o.account_id));
+}
+function clearSession(){
+  app.token = null; app.username = null; app.accountId = null; app.myCards = [];
+  try{ ["aov-token","aov-username","aov-account"].forEach(k => localStorage.removeItem(k)); }catch(e){}
+}
+const mapType = t => { t = String(t || "").toLowerCase().trim(); return (t === "truth" || t === "verite" || t === "vérité" || t === "v") ? "truth" : "dare"; };
+function renderDefis(){
+  const logged = !!app.token;
+  $("#auth-box").style.display = logged ? "none" : "block";
+  $("#defis-box").style.display = logged ? "block" : "none";
+  if(logged){
+    $("#acc-name").textContent = app.username || "Compte";
+    $("#switch-personal").classList.toggle("on", app.includePersonal);
+    loadMyCards();
+  }
+}
+async function handleAuth(){
+  const u = $("#auth-username").value.trim();
+  const p = $("#auth-password").value;
+  const pin = $("#auth-pin").value.trim();
+  const msg = $("#auth-msg");
+  msg.textContent = "";
+  if(u.length < 3){ msg.textContent = "Nom d'utilisateur trop court (3 caractères minimum)."; return; }
+  if(!p && !pin){ msg.textContent = "Saisissez un mot de passe OU un code PIN."; return; }
+  if(pin && !/^\d{4}$/.test(pin)){ msg.textContent = "Le code PIN doit contenir 4 chiffres."; return; }
+  const fn = app.authMode === "signup" ? "sign_up" : "sign_in";
+  try{
+    const res = await rpc(fn, { p_username: u, p_password: p || "", p_pin: pin || "" });
+    setSession(res);
+    app.includePersonal = true; safeSet("aov-personal", "on");
+    $("#auth-username").value = ""; $("#auth-password").value = ""; $("#auth-pin").value = "";
+    renderDefis();
+    sfx.win();
+    toast(app.authMode === "signup" ? "Compte créé — bienvenue !" : "Connecté");
+  }catch(e){
+    msg.textContent = (e.message || "").indexOf("Could not find the function") >= 0
+      ? "Base non à jour : exécutez migration_cards.sql dans Supabase." : e.message;
+  }
+}
+async function loadMyCards(){
+  try{
+    const arr = await rpc("my_cards", { p_token: app.token });
+    app.myCards = Array.isArray(arr) ? arr : [];
+  }catch(e){ app.myCards = []; }
+  $("#mycount").textContent = app.myCards.length;
+  const list = $("#mycards-list");
+  const shown = app.myCards.slice(0, 200);
+  list.innerHTML = shown.map(c =>
+    '<div class="drow">' +
+      '<span class="dtag ' + (c.type === "truth" ? "truth" : "dare") + '">' + (c.type === "truth" ? "Vérité" : "Action") + '</span>' +
+      '<span class="dtext">' + esc(c.text) + '</span>' +
+      '<button class="icon-btn sm danger ddel" data-id="' + c.id + '" title="Supprimer">' + iconSvg("trash") + '</button>' +
+    '</div>'
+  ).join("") || '<div class="empty">Aucun défi personnel pour le moment.</div>';
+  if(app.myCards.length > 200){
+    list.innerHTML += '<div class="empty">… et ' + (app.myCards.length - 200) + ' autres défis (les 200 derniers sont affichés)</div>';
+  }
+}
+async function addDefi(){
+  const t = $("#defi-text").value.trim();
+  if(t.length < 4){ toast("Écrivez un défi d'au moins 4 caractères"); return; }
+  try{
+    await rpc("add_card", { p_token: app.token, p_type: app.defiType, p_text: t });
+    $("#defi-text").value = "";
+    sfx.click(); toast("Défi ajouté à votre compte");
+    loadMyCards();
+  }catch(e){ toast("Erreur : " + e.message); }
+}
+async function delDefi(id){
+  try{ await rpc("delete_card", { p_token: app.token, p_card_id: id }); sfx.click(); loadMyCards(); }
+  catch(e){ toast("Erreur : " + e.message); }
+}
+async function handleImport(file){
+  const msg = $("#import-msg"); msg.textContent = "";
+  const raw = await file.text();
+  let cards = [];
+  try{
+    const j = JSON.parse(raw);
+    const arr = Array.isArray(j) ? j : (Array.isArray(j.cards) ? j.cards : null);
+    if(!arr) throw 0;
+    cards = arr.map(it => {
+      if(typeof it === "string") return { type: app.importType, text: it.trim() };
+      const o = it || {};
+      return { type: mapType(o.type || o.t || app.importType), text: String(o.text || o.t || "").trim() };
+    });
+  }catch(e){
+    cards = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean).map(l => {
+      const m = l.match(/^(action|verite|vérité|a|v)\s*[:\-]\s*(.*)$/i);
+      if(m) return { type: /^a/i.test(m[1]) ? "dare" : "truth", text: m[2].trim() };
+      return { type: app.importType, text: l };
+    });
+  }
+  cards = cards.filter(c => c && c.text && c.text.length >= 4)
+               .map(c => ({ type: c.type === "truth" ? "truth" : "dare", text: c.text }));
+  if(!cards.length){ msg.textContent = "Aucun défi valide trouvé dans ce fichier."; return; }
+  let added = 0;
+  try{
+    for(let i = 0; i < cards.length; i += 500){
+      added += await rpc("import_cards", { p_token: app.token, p_cards: cards.slice(i, i + 500) });
+    }
+    msg.textContent = added + " défi(s) importé(s) sur " + cards.length + " trouvé(s).";
+    $("#import-file").value = "";
+    sfx.win(); loadMyCards();
+  }catch(e){ msg.textContent = "Erreur : " + e.message; }
+}
+function bindDefis(){
+  $$("#auth-tabs button").forEach(b => b.addEventListener("click", () => {
+    app.authMode = b.dataset.t;
+    $$("#auth-tabs button").forEach(x => x.classList.toggle("sel", x === b));
+    $("#auth-submit").innerHTML = app.authMode === "signup"
+      ? '<span data-icon="user"></span>Créer mon compte'
+      : '<span data-icon="user"></span>Se connecter';
+    injectIcons();
+  }));
+  $("#auth-submit").addEventListener("click", handleAuth);
+  ["#auth-username","#auth-password","#auth-pin"].forEach(sel => {
+    $(sel).addEventListener("keydown", e => { if(e.key === "Enter") handleAuth(); });
+  });
+  $("#btn-logout").addEventListener("click", async () => {
+    try{ await rpc("sign_out", { p_token: app.token }); }catch(e){}
+    clearSession(); renderDefis(); toast("Déconnecté");
+  });
+  $$("#defi-type-seg button").forEach(b => b.addEventListener("click", () => {
+    app.defiType = b.dataset.t;
+    $$("#defi-type-seg button").forEach(x => x.classList.toggle("sel", x === b));
+  }));
+  $$("#import-type-seg button").forEach(b => b.addEventListener("click", () => {
+    app.importType = b.dataset.t;
+    $$("#import-type-seg button").forEach(x => x.classList.toggle("sel", x === b));
+  }));
+  $("#btn-add-defi").addEventListener("click", addDefi);
+  $("#btn-import").addEventListener("click", () => {
+    const f = $("#import-file").files[0];
+    if(!f){ toast("Choisissez d'abord un fichier"); return; }
+    handleImport(f);
+  });
+  $("#switch-personal").addEventListener("click", () => {
+    app.includePersonal = !app.includePersonal;
+    safeSet("aov-personal", app.includePersonal ? "on" : "off");
+    $("#switch-personal").classList.toggle("on", app.includePersonal);
+    sfx.click();
+  });
+  $("#mycards-list").addEventListener("click", e => {
+    const b = e.target.closest(".ddel"); if(!b) return;
+    delDefi(b.dataset.id);
+  });
+}
+async function initSession(){
+  if(!app.token) return;
+  try{
+    const me = await rpc("me", { p_token: app.token });
+    if(me && me.id){
+      app.username = me.username; app.accountId = me.id;
+      loadMyCards();
+    }else{ clearSession(); }
+  }catch(e){ clearSession(); }
+}
+
 /* ===================== INIT ===================== */
 (async function init(){
   injectIcons();
@@ -1393,7 +1654,7 @@ function bindSettings(){
   initGate();
   applyTheme();
   applyPalette();
-  bindNav(); bindHome(); bindGame(); bindSettings();
+  bindNav(); bindHome(); bindGame(); bindSettings(); bindDefis();
   if(sysDark && sysDark.addEventListener) sysDark.addEventListener("change", () => { if(app.theme === "auto") applyTheme(); });
   else if(sysDark) sysDark.addListener(() => { if(app.theme === "auto") applyTheme(); });
   $("#switch-sound").classList.toggle("on", app.sound);
@@ -1414,6 +1675,8 @@ function bindSettings(){
       toast("Impossible de joindre Supabase — vérifiez l'URL et la clé dans index.html");
     }
   }
+  await initSession();
+  renderDefis();
   renderHome();
 })();
 </script>
