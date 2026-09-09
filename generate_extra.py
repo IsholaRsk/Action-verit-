@@ -774,6 +774,16 @@ insert_block = "insert into public.cards (type, level, text) values\n" + ",\n".j
     "('%s', '%s', '%s')" % (c["type"], c["level"], esc(c["text"])) for c in cards
 ) + ";"
 
+# --- Découpage des cartes en 2 blocs pour des scripts SQL légers ---
+half = 5000
+def make_block(sublist):
+    return "insert into public.cards (type, level, text) values\n" + ",\n".join(
+        "('%s', '%s', '%s')" % (c["type"], c["level"], esc(c["text"])) for c in sublist
+    ) + ";"
+
+insert_block_a = make_block(cards[:half])
+insert_block_b = make_block(cards[half:])
+
 HEADER = """-- =====================================================================
 --  ACTION OU VERITE -- BACKEND SUPABASE COMPLET (fichier unique)
 --  10000 cartes niveau "brulant" (436 d'origine + 1064 brûlant + 2000 hardcore + 6500 hardcore++)
@@ -1167,8 +1177,9 @@ with open("supabase.sql", "w", encoding="utf-8") as f:
     f.write(HEADER + "    " + insert_block.replace("\n", "\n    ") + "\n" + FOOTER + AUTH_SQL)
 
 MIGRATION = """-- =====================================================================
---  MIGRATION : 10000 cartes "brulant" (436 d'origine + 1064 brûlant + 2000 hardcore + 6500 hardcore++)
---  Supabase -> SQL Editor -> New query -> coller tout -> RUN
+--  MIGRATION (PARTIE 1/2) : schéma + fonctions + comptes + cartes 1 à 5000
+--  À exécuter D'ABORD : Supabase -> SQL Editor -> New query -> coller -> RUN
+--  Puis exécuter migration_cards_2.sql (cartes 5001 à 10000)
 -- =====================================================================
 begin;
 
@@ -1189,7 +1200,7 @@ drop policy if exists "cards_public_read" on public.cards;
 create policy "cards_public_read" on public.cards for select using (true);
 grant select on public.cards to anon, authenticated;
 
-""" + insert_block + """
+""" + insert_block_a + """
 
 create or replace function public.draw_card(p_type text, p_level text)
 returns public.cards
@@ -1261,7 +1272,21 @@ commit;
 with open("migration_cards.sql", "w", encoding="utf-8") as f:
     f.write(MIGRATION)
 
-print("supabase.sql + migration_cards.sql écrits")
+MIGRATION_PART2 = """-- =====================================================================
+--  MIGRATION (PARTIE 2/2) : cartes 5001 à 10000
+--  À exécuter APRÈS migration_cards.sql (la table public.cards doit exister)
+-- =====================================================================
+begin;
+
+""" + insert_block_b + """
+
+commit;
+"""
+
+with open("migration_cards_2.sql", "w", encoding="utf-8") as f:
+    f.write(MIGRATION_PART2)
+
+print("supabase.sql + migration_cards.sql (1/2) + migration_cards_2.sql (2/2) écrits")
 
 # échantillons
 print("\nÉchantillon nouvelles actions :")

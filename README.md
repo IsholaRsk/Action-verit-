@@ -8,7 +8,8 @@ Jeu d'ambiance adulte connecté à Supabase, avec **10000 défis (Brûlant + Har
 |---|---|
 | `index.html` | Application complète (thème sombre/clair/auto, 5 palettes, glassmorphism, icônes SVG, navigation basse) |
 | `supabase.sql` | Backend complet **pour une base neuve** (10000 cartes, tables, RLS, fonctions RPC) |
-| `migration_cards.sql` | **Migration** : remplace les cartes existantes par les 10000 (à exécuter si un ancien script a déjà tourné) |
+| `migration_cards.sql` | **Migration (1/2)** : schéma + fonctions + comptes + cartes 1 à 5000 (~700 Ko) |
+| `migration_cards_2.sql` | **Migration (2/2)** : cartes 5001 à 10000 (~690 Ko) |
 | `cards.json` | Les 10000 cartes au format JSON (données brutes) |
 | `generate_extra.py` | Générateur des 9564 cartes supplémentaires (1064 brûlant + 2000 hardcore + 6500 hardcore++, relançable) |
 
@@ -25,7 +26,11 @@ Jeu d'ambiance adulte connecté à Supabase, avec **10000 défis (Brûlant + Har
 ### 1) Base de données (une seule fois)
 Dans Supabase → **SQL Editor → New query** :
 - **Base neuve** → colle tout `supabase.sql` → Run.
-- **Base existante** → colle tout `migration_cards.sql` → Run.
+- **Base existante** → exécute dans l'ordre :
+  1. `migration_cards.sql` (schéma + fonctions + comptes + cartes 1 à 5000) → Run
+  2. `migration_cards_2.sql` (cartes 5001 à 10000) → Run
+
+> Les deux fichiers de migration sont volontairement légers (~700 Ko chacun) pour passer sans souci dans l'éditeur SQL de Supabase.
 
 ### 2) Frontend
 La connexion est déjà configurée dans `index.html` :
