@@ -1,22 +1,22 @@
 # Action ou Vérité — Édition Premium
 
-Jeu d'ambiance adulte connecté à Supabase, avec **3500 défis (Brûlant + Hardcore)**.
+Jeu d'ambiance adulte connecté à Supabase, avec **10000 défis (Brûlant + Hardcore)**.
 
 ## Fichiers
 
 | Fichier | Rôle |
 |---|---|
 | `index.html` | Application complète (thème sombre/clair/auto, 5 palettes, glassmorphism, icônes SVG, navigation basse) |
-| `supabase.sql` | Backend complet **pour une base neuve** (3500 cartes, tables, RLS, fonctions RPC) |
-| `migration_cards.sql` | **Migration** : remplace les cartes existantes par les 3500 (à exécuter si un ancien script a déjà tourné) |
-| `cards.json` | Les 3500 cartes au format JSON (données brutes) |
-| `generate_extra.py` | Générateur des 3064 cartes supplémentaires (1064 brûlant + 2000 hardcore, relançable) |
+| `supabase.sql` | Backend complet **pour une base neuve** (10000 cartes, tables, RLS, fonctions RPC) |
+| `migration_cards.sql` | **Migration** : remplace les cartes existantes par les 10000 (à exécuter si un ancien script a déjà tourné) |
+| `cards.json` | Les 10000 cartes au format JSON (données brutes) |
+| `generate_extra.py` | Générateur des 9564 cartes supplémentaires (1064 brûlant + 2000 hardcore + 6500 hardcore++, relançable) |
 
-## Les 3500 cartes
+## Les 10000 cartes
 
 - **Niveau unique** : `brulant` (Brûlant) — aucune sélection de mode dans l'app.
-- **Types** : `truth` = 1472 vérités · `dare` = 2028 actions.
-- Composition : **436 cartes du fichier « Json a ou v »** + **1064 nouvelles brûlant** + **2000 nouvelles hardcore**.
+- **Types** : `truth` = 5000 vérités · `dare` = 5000 actions.
+- Composition : **436 cartes du fichier « Json a ou v »** + **1064 brûlant** + **2000 hardcore** + **6500 hardcore++**.
 - Les **actions** visent toujours une personne **du sexe opposé**.
 - Format : `{ "id", "type", "level", "text" }` — `verite → truth`, `action → dare`.
 

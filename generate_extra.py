@@ -2,8 +2,9 @@
 # -*- coding: utf-8 -*-
 """
 Génère 1064 cartes « brulant » (616 actions + 448 vérités)
-+ 2000 cartes « hardcore » (1160 actions + 840 vérités), puis reconstruit :
-  - cards.json          (436 + 1064 + 2000 = 3500 cartes)
++ 2000 cartes « hardcore » (1160 actions + 840 vérités)
++ 6500 cartes « hardcore++ » (2972 actions + 3528 vérités), puis reconstruit :
+  - cards.json          (436 + 1064 + 2000 + 6500 = 10000 cartes)
   - supabase.sql        (installation complète)
   - migration_cards.sql (migration pour base existante)
 """
@@ -572,7 +573,155 @@ random.shuffle(hard_truths)
 hard_truths = hard_truths[:840]
 
 # ----------------------------------------------------------------------
-# 5) Assemblage final : 436 + 1064 + 2000 = 3500
+# 4ter) 6500 cartes HARDCORE++ (2972 actions + 3528 vérités) — niveau brulant
+# ----------------------------------------------------------------------
+HZ2 = [
+    "le cou", "la nuque", "la clavicule", "la poitrine", "le torse", "le ventre",
+    "le nombril", "les hanches", "le bas du dos", "les reins", "les fesses",
+    "l'intérieur des cuisses", "les cuisses", "le creux du genou", "la cheville",
+    "le lobe de l'oreille", "l'intérieur du poignet", "la mâchoire", "l'oreille",
+    "les omoplates", "la colonne vertébrale", "le sternum", "les côtes", "le bas-ventre",
+]
+P2 = P + ["la personne la plus audacieuse du groupe", "la personne la plus timide du groupe"]
+V_DIR = [
+    "Caresse", "Masse", "Embrasse", "Lèche lentement", "Mordille",
+    "Effleure du bout des doigts", "Touche", "Presse fermement", "Suce",
+    "Pince doucement", "Griffe légèrement", "Gratte du bout des ongles",
+]
+DUR2 = ["pendant 10 secondes", "pendant 15 secondes", "pendant 30 secondes",
+        "pendant 1 minute", "pendant 2 minutes", "pendant 3 minutes", "pendant 5 minutes"]
+MAN2 = ["en gardant le contact visuel", "sans utiliser les mains", "les yeux fermés",
+        "en chuchotant quelque chose d'osé", "en respirant fort dans son cou",
+        "en laissant une marque visible", "très lentement", "en rythme avec la musique",
+        "en te collant à lui/elle", "avec un glaçon dans la bouche"]
+V_SUR = ["Fais glisser un glaçon sur", "Fais glisser ta langue sur", "Fais glisser tes ongles sur",
+         "Trace des cercles avec ta langue sur", "Fais couler du miel sur", "Passe une plume sur",
+         "Souffle doucement sur", "Dépose une traînée de baisers sur", "Écris un mot coquin avec ta langue sur"]
+
+hx_action_candidates = []
+for v in V_DIR:
+    for z in HZ2:
+        for p in P2:
+            for d in DUR2:
+                for m in MAN2:
+                    hx_action_candidates.append(f"{v} {z} de {p} {d}, {m}.")
+for v in V_SUR:
+    for z in HZ2:
+        for p in P2:
+            for d in DUR2:
+                hx_action_candidates.append(f"{v} {z} de {p} {d}.")
+for p in P2:
+    for n in ["trois", "cinq", "dix"]:
+        hx_action_candidates.append(f"Donne {n} claques sur les fesses de {p}, avec son accord, en comptant à voix haute.")
+        hx_action_candidates.append(f"Donne {n} claques sur l'arrière des cuisses de {p}, avec son accord.")
+    for obj in ["une ceinture", "une écharpe", "un foulard", "des lacets"]:
+        hx_action_candidates.append(f"Attache les poignets de {p} dans le dos avec {obj}, puis embrasse sa nuque pendant 1 minute.")
+        hx_action_candidates.append(f"Bande les yeux de {p} avec {obj}, puis fais-lui deviner un objet avec ses lèvres.")
+        hx_action_candidates.append(f"Attache les chevilles de {p} avec {obj}, puis caresse l'intérieur de ses cuisses pendant 1 minute.")
+    for d in DUR2:
+        hx_action_candidates.append(f"Fais un lap dance à {p} {d}, sans jamais le toucher avec les mains.")
+        hx_action_candidates.append(f"Assois-toi à califourchon sur {p} {d}, en bougeant au rythme de la musique.")
+        hx_action_candidates.append(f"Garde {p} contre le mur {d}, en lui tenant les poignets au-dessus de la tête.")
+    hx_action_candidates.append(f"Ordonne à {p} de s'agenouiller devant toi pendant 1 minute, sans dire un mot.")
+    hx_action_candidates.append(f"Fais un body shot sur le nombril de {p} : sel, shot, citron, le tout récupéré avec ta bouche.")
+    hx_action_candidates.append(f"Tire doucement les cheveux de {p} vers l'arrière tout en lui mordillant le cou.")
+
+hx_action_candidates += [
+    "Joue au docteur avec la personne de ton choix pendant 2 minutes : examen très rapproché, sans les mains.",
+    "Fais semblant de dessiner le portrait de la personne en face de toi en détaillant son corps à voix haute.",
+    "Laisse la personne de ton choix t'embrasser le cou pendant que tu dois garder les yeux ouverts.",
+    "Imite une scène de film coquine avec la personne à ta droite, en y mettant le ton.",
+    "Demande à la personne à ta gauche de poser une main sur ton cou pendant 30 secondes.",
+    "Fais un twerk de 20 secondes devant la personne de ton choix.",
+    "Glisse ta main dans la poche arrière de la personne de ton choix pendant 15 secondes.",
+    "Fais boire la personne en face de toi à la régalade, en te tenant très près de sa bouche.",
+    "Suspends ton visage à quelques centimètres de la personne de ton choix pendant 30 secondes, sans l'embrasser.",
+    "Fais un slow collé-serré avec la personne de ton choix sur une musique de ton choix.",
+    "Trace le contour du visage de la personne à ta droite avec le bout de ta langue.",
+    "Mets du rouge à lèvres et laisse une marque sur le cou de la personne de ton choix.",
+    "Masse les épaules de la personne en face de toi en t'asseyant sur elle.",
+    "Porte la personne de ton choix dans tes bras pendant 20 secondes, puis dépose-la doucement.",
+    "Reste immobile pendant que la personne de ton choix promène ses mains à deux centimètres de ton corps, sans te toucher.",
+    "Écris un mot coquin avec ta langue sur le dos de la personne à ta gauche, qui doit le deviner.",
+    "Chante une chanson sensuelle en regardant la personne de ton choix dans les yeux.",
+    "Joue à ne pas reculer : vos lèvres se rapprochent, personne ne doit rompre le contact des yeux.",
+    "Laisse la personne en face de toi t'attacher les mains devant et te faire danser pendant 30 secondes.",
+    "Rejoue ton rêve le plus osé en ombre chinoise avec tes mains, devant le groupe.",
+    "Masse la mâchoire de la personne de ton choix en chuchotant son prénom.",
+    "Échange ton souffle avec la personne à ta droite, front contre front, pendant 30 secondes.",
+    "Fais un défilé de mode sensuel avec trois accessoires du groupe, en musique.",
+    "Tiens la personne de ton choix par les hanches et guide-la dans une danse très lente.",
+    "Reste à quatre pattes pendant que la personne de ton choix te tapote le dos du bout des doigts pendant 30 secondes.",
+    "Fais un câlin par-derrière à la personne à ta gauche en la berçant pendant 1 minute.",
+    "Demande à la personne de ton choix de te servir un verre, puis bois-le dans sa main.",
+    "Fais une déclaration très osée à la personne en face de toi, à genoux.",
+    "Laisse la personne la plus audacieuse du groupe te faire un body shot où elle veut.",
+    "Fais un massage de la nuque à la personne la plus timide du groupe en la rassurant à voix basse.",
+]
+hx_action_candidates = [fix(t) for t in hx_action_candidates]
+
+TV2 = ["touche", "caresse", "embrasse", "lèche", "mordille", "masse", "suce", "effleure", "pince doucement", "griffe"]
+GER2 = {"touche": "touchant", "caresse": "caressant", "embrasse": "embrassant", "lèche": "léchant",
+        "mordille": "mordillant", "masse": "massant", "suce": "suçant", "effleure": "effleurant",
+        "pince doucement": "pinçant doucement", "griffe": "griffant"}
+hx_truth_candidates = []
+for p in P2:
+    for z in HZ2:
+        for v in TV2:
+            for d in ["10 secondes", "15 secondes", "30 secondes", "1 minute", "2 minutes", "3 minutes", "5 minutes"]:
+                hx_truth_candidates.append(f"Décris ce que tu ressentirais si {p} te {v} {z} pendant {d}.")
+                hx_truth_candidates.append(f"Quelle serait ta réaction si {p} te {v} {z} sans prévenir ?")
+                hx_truth_candidates.append(f"Préférerais-tu que {p} te {v} {z} pendant {d}, ou l'inverse ?")
+                hx_truth_candidates.append(f"Raconte, en détail, un scénario où {p} te {v} {z} pendant {d}.")
+                hx_truth_candidates.append(f"Quel bruit ferais-tu si {p} te {v} {z} pendant {d} ?")
+                hx_truth_candidates.append(f"Décris la sensation que te procurerait {p} en te {GER2[v]} {z} pendant {d}.")
+
+hx_truth_candidates += [
+    "Quel est le geste que la personne de ton choix pourrait faire pour te faire supplier ?",
+    "As-tu déjà été avec quelqu'un qui aimait dominer ? Raconte.",
+    "Quelle est la chose la plus déplacée qu'on t'ait dite pendant un moment intime ?",
+    "Quel accessoire aimerais-tu que la personne de ton choix utilise sur toi ?",
+    "As-tu déjà envoyé un message que tu regrettes ? À qui et pourquoi ?",
+    "Quelle est la tenue la plus osée que tu porterais pour quelqu'un qui te plaît ?",
+    "Quelle est la partie du corps de la personne de ton choix que tu aimerais explorer le plus longtemps ?",
+    "As-tu déjà rêvé d'être attaché(e) ou d'attacher quelqu'un ? Décris.",
+    "Quel est ton rituel pour te mettre dans l'ambiance ?",
+    "As-tu déjà été attiré(e) par la voix de quelqu'un au point d'y penser le soir ?",
+    "Quel est le plus long baiser de ta vie ? Raconte le contexte.",
+    "Quelle est la question la plus gênante qu'on t'ait posée sur ta vie intime ?",
+    "As-tu déjà eu un jeu de rôle préféré au lit ? Lequel ?",
+    "Quel est le compliment le plus pervers qu'on t'ait fait ?",
+    "As-tu déjà jalousé quelqu'un pour son corps ? Qui et pourquoi ?",
+    "Quelle est la chose que tu fais exprès pour attirer l'attention de quelqu'un qui te plaît ?",
+    "As-tu déjà été surpris(e) par ton propre désir pour quelqu'un d'inattendu ?",
+    "Quelle est ta définition d'une soirée parfaitement réussie, sans tabou ?",
+    "As-tu déjà ressenti un désir interdit pour quelqu'un d'ici ?",
+    "Quel est le scénario le plus fou que tu accepterais de vivre ce soir ?",
+    "As-tu déjà flirté avec deux personnes en même temps ? Comment ça s'est terminé ?",
+    "Quelle est la partie de ton corps que tu aimerais qu'on découvre en premier ?",
+    "As-tu déjà dit je t'aime sans le penser, ou pensé je t'aime sans le dire ?",
+    "Quel est le mensonge le plus sexy que tu aies raconté ?",
+    "Quelle est la chose que tu n'as jamais osé demander, de peur qu'on te juge ?",
+    "As-tu déjà été intimidé(e) par le désir de quelqu'un ?",
+    "Quel est ton souvenir le plus chaud de cette année ?",
+    "As-tu déjà eu envie de tout plaquer pour suivre quelqu'un ?",
+    "Quelle est la phrase qui te fait le plus fondre au lit ?",
+    "As-tu déjà partagé un secret avec quelqu'un juste après un moment intime ?",
+]
+hx_truth_candidates = [fix(t) for t in hx_truth_candidates]
+
+used |= set(hard_truths)
+hx_actions = dedup(hx_action_candidates, used)
+random.shuffle(hx_actions)
+hx_actions = hx_actions[:2972]
+
+used |= set(hx_actions)
+hx_truths = dedup(hx_truth_candidates, used)
+random.shuffle(hx_truths)
+hx_truths = hx_truths[:3528]
+
+# ----------------------------------------------------------------------
+# 5) Assemblage final : 436 + 1064 + 2000 + 6500 = 10000
 # ----------------------------------------------------------------------
 cards, cid = [], 1
 for d in src:  # les 436 d'origine
@@ -593,11 +742,18 @@ for t in hard_actions:
 for t in hard_truths:
     cards.append({"id": cid, "type": "truth", "level": "brulant", "text": t})
     cid += 1
+for t in hx_actions:
+    cards.append({"id": cid, "type": "dare", "level": "brulant", "text": opposite_sex(t)})
+    cid += 1
+for t in hx_truths:
+    cards.append({"id": cid, "type": "truth", "level": "brulant", "text": t})
+    cid += 1
 
 texts = [c["text"] for c in cards]
-assert len(texts) == len(set(texts)) == 3500, "Doublons détectés !"
+assert len(texts) == len(set(texts)) == 10000, "Doublons détectés !"
 assert len(new_actions) == 616 and len(new_truths) == 448, "Comptage erroné"
 assert len(hard_actions) == 1160 and len(hard_truths) == 840, "Comptage hardcore erroné"
+assert len(hx_actions) == 2972 and len(hx_truths) == 3528, "Comptage hardcore++ erroné"
 
 print("Total cartes :", len(cards))
 from collections import Counter
@@ -606,7 +762,7 @@ for k in sorted(cnt):
     print("  ", k, "->", cnt[k])
 
 json.dump(cards, open("cards.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
-print("cards.json écrit (3500 cartes)")
+print("cards.json écrit (10000 cartes)")
 
 # ----------------------------------------------------------------------
 # 6) SQL
@@ -620,7 +776,7 @@ insert_block = "insert into public.cards (type, level, text) values\n" + ",\n".j
 
 HEADER = """-- =====================================================================
 --  ACTION OU VERITE -- BACKEND SUPABASE COMPLET (fichier unique)
---  3500 cartes niveau "brulant" (436 d'origine + 1064 brûlant + 2000 hardcore)
+--  10000 cartes niveau "brulant" (436 d'origine + 1064 brûlant + 2000 hardcore + 6500 hardcore++)
 --  Supabase -> SQL Editor -> New query -> coller tout -> RUN
 -- =====================================================================
 
@@ -777,7 +933,7 @@ with open("supabase.sql", "w", encoding="utf-8") as f:
     f.write(HEADER + "    " + insert_block.replace("\n", "\n    ") + "\n" + FOOTER)
 
 MIGRATION = """-- =====================================================================
---  MIGRATION : 3500 cartes "brulant" (436 d'origine + 1064 brûlant + 2000 hardcore)
+--  MIGRATION : 10000 cartes "brulant" (436 d'origine + 1064 brûlant + 2000 hardcore + 6500 hardcore++)
 --  Supabase -> SQL Editor -> New query -> coller tout -> RUN
 -- =====================================================================
 begin;
@@ -883,4 +1039,10 @@ for t in hard_actions[:4]:
     print("  ", opposite_sex(t))
 print("Échantillon hardcore vérités :")
 for t in hard_truths[:4]:
+    print("  ", t)
+print("\nÉchantillon hardcore++ actions :")
+for t in hx_actions[:4]:
+    print("  ", opposite_sex(t))
+print("Échantillon hardcore++ vérités :")
+for t in hx_truths[:4]:
     print("  ", t)
