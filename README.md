@@ -48,6 +48,7 @@ Déployez `index.html` (Netlify, Vercel, GitHub Pages…) ou ouvrez-le localemen
 - **Se connecter** : nom d'utilisateur + **code PIN** (le même que celui choisi à la création).
 - Une fois connecté, on peut **ajouter un défi** (Action / Vérité) ou **importer un fichier** (`.json` ou `.txt`, un défi par ligne, préfixe `action:` / `verite:` optionnel).
 - Ces défis sont **sauvegardés uniquement sur le compte** (table `user_cards`, accès par token de session).
+- Bouton **globe** sur chaque défi : **publie** le défi pour qu'il rejoigne le paquet commun et soit **accessible à tous les joueurs** (table `cards`, source `community`). Re-cliquer pour le retirer.
 - Option « **Inclure mes défis dans la partie** » : le jeu pioche alors aussi parmi les défis personnels du compte connecté.
 
 ## RPC disponibles (appels depuis l'app)
@@ -66,6 +67,8 @@ Déployez `index.html` (Netlify, Vercel, GitHub Pages…) ou ouvrez-le localemen
 | `import_cards` | `POST /rest/v1/rpc/import_cards` | `{ "p_token", "p_cards": [{ "type", "text" }] }` |
 | `my_cards` | `POST /rest/v1/rpc/my_cards` | `{ "p_token" }` |
 | `delete_card` | `POST /rest/v1/rpc/delete_card` | `{ "p_token", "p_card_id" }` |
+| `publish_card` | `POST /rest/v1/rpc/publish_card` | `{ "p_token", "p_card_id" }` — rend le défi **accessible à tous** |
+| `unpublish_card` | `POST /rest/v1/rpc/unpublish_card` | `{ "p_token", "p_card_id" }` — retire le défi du paquet commun |
 
 Tables REST : `GET/POST/PATCH/DELETE /rest/v1/players`, `GET /rest/v1/history?select=*&order=id.desc&limit=200`.
 Les codes PIN sont **hachés** (bcrypt via pgcrypto) ; les tables `accounts` / `sessions` / `user_cards` sont en RLS sans politique (accès uniquement via les RPC).

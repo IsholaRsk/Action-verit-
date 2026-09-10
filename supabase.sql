@@ -10180,6 +10180,11 @@ create table if not exists public.user_cards (
 );
 create index if not exists user_cards_account_type_idx on public.user_cards (account_id, type);
 
+-- Colonnes "communauté" : un défi publié rejoint le paquet commun (accessible à tous)
+alter table public.cards       add column if not exists source    text not null default 'base';
+alter table public.cards       add column if not exists author_id bigint;
+alter table public.user_cards  add column if not exists public_id bigint;
+
 alter table public.accounts   enable row level security;
 alter table public.sessions   enable row level security;
 alter table public.user_cards enable row level security;
@@ -10329,7 +10334,7 @@ begin
   if v_acc is null then raise exception 'Non connecte'; end if;
   return coalesce((
     select json_agg(x) from (
-      select json_build_object('id', id, 'type', type, 'level', level, 'text', text) as x
+      select json_build_object('id', id, 'type', type, 'level', level, 'text', text, 'public_id', public_id) as x
         from public.user_cards
        where account_id = v_acc
        order by id desc
@@ -10354,6 +10359,51 @@ begin
 end;
 $fn$;
 
+create or replace function public.publish_card(p_token uuid, p_card_id bigint)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+declare
+  v_acc bigint;
+  uc public.user_cards%rowtype;
+  nid bigint;
+begin
+  select account_id into v_acc from public.sessions where token = p_token;
+  if v_acc is null then raise exception 'Non connecte'; end if;
+  select * into uc from public.user_cards where id = p_card_id and account_id = v_acc;
+  if uc.id is null then raise exception 'Défi introuvable'; end if;
+  if uc.public_id is not null then
+    return json_build_object('id', uc.public_id, 'already', true);
+  end if;
+  insert into public.cards (type, level, text, source, author_id)
+  values (uc.type, 'brulant', uc.text, 'community', v_acc)
+  returning id into nid;
+  update public.user_cards set public_id = nid where id = uc.id;
+  return json_build_object('id', nid, 'already', false);
+end;
+$fn$;
+
+create or replace function public.unpublish_card(p_token uuid, p_card_id bigint)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+declare
+  v_acc bigint;
+  uc public.user_cards%rowtype;
+begin
+  select account_id into v_acc from public.sessions where token = p_token;
+  if v_acc is null then raise exception 'Non connecte'; end if;
+  select * into uc from public.user_cards where id = p_card_id and account_id = v_acc;
+  if uc.id is null then raise exception 'Défi introuvable'; end if;
+  delete from public.cards where id = uc.public_id and source = 'community' and author_id = v_acc;
+  update public.user_cards set public_id = null where id = uc.id;
+end;
+$fn$;
+
 grant execute on function public.sign_up(text, text) to anon, authenticated;
 grant execute on function public.sign_in(text, text) to anon, authenticated;
 grant execute on function public.me(uuid) to anon, authenticated;
@@ -10362,3 +10412,5 @@ grant execute on function public.add_card(uuid, text, text) to anon, authenticat
 grant execute on function public.import_cards(uuid, jsonb) to anon, authenticated;
 grant execute on function public.my_cards(uuid) to anon, authenticated;
 grant execute on function public.delete_card(uuid, bigint) to anon, authenticated;
+grant execute on function public.publish_card(uuid, bigint) to anon, authenticated;
+grant execute on function public.unpublish_card(uuid, bigint) to anon, authenticated;
