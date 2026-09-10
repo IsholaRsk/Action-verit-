@@ -73,7 +73,7 @@ Les codes PIN sont **hachés** (bcrypt via pgcrypto) ; les tables `accounts` / `
 ## Thème & palettes
 
 - **Palette par défaut** : **Hot** 🔥 (rouge / or / violet sur fond quasi noir, titre en serif, scanlines + particules, portail 18+).
-- **10 palettes** : Hot, Aurora, Émeraude, Océan, Coucher, **Or**, **Rouge**, **Jaune**, **Rose**, **Liquid Glass** — Réglages → Palette de couleurs.
+- **10 palettes** : Hot, Aurora, Émeraude, Océan, Coucher, **Or**, **Rouge**, **Gris**, **Rose**, **Liquid Glass** — Réglages → Palette de couleurs.
 - **Thème** : sombre, clair ou automatique (suit l'appareil) — bouton lune/soleil en haut, ou Réglages.
 - **Portail adulte** : à l'ouverture, un écran « Adultes uniquement » s'affiche (accepté = mémorisé pour la session).
 - Choix mémorisés dans `localStorage`.
