@@ -6,7 +6,7 @@ Jeu d'ambiance adulte connecté à Supabase, avec **10000 défis (Brûlant + Har
 
 | Fichier | Rôle |
 |---|---|
-| `index.html` | Application complète (thème sombre/clair/auto, 5 palettes, glassmorphism, icônes SVG, navigation basse) |
+| `index.html` | Application complète (thème sombre/clair/auto, 10 palettes, glassmorphism, icônes SVG, navigation basse) |
 | `supabase.sql` | Backend complet **pour une base neuve** (10000 cartes, tables, RLS, fonctions RPC) |
 | `migration_cards.sql` | **Migration (1/2)** : schéma + fonctions + comptes + cartes 1 à 5000 (~700 Ko) |
 | `migration_cards_2.sql` | **Migration (2/2)** : cartes 5001 à 10000 (~690 Ko) |
@@ -44,8 +44,8 @@ Déployez `index.html` (Netlify, Vercel, GitHub Pages…) ou ouvrez-le localemen
 
 ## Comptes & défis personnels
 
-- **Créer un compte** : nom d'utilisateur + **mot de passe OU code PIN (4 chiffres)**.
-- **Se connecter** : même chose — mot de passe ou PIN, au choix.
+- **Créer un compte** : nom d'utilisateur + **code PIN (4 chiffres)**.
+- **Se connecter** : nom d'utilisateur + **code PIN** (le même que celui choisi à la création).
 - Une fois connecté, on peut **ajouter un défi** (Action / Vérité) ou **importer un fichier** (`.json` ou `.txt`, un défi par ligne, préfixe `action:` / `verite:` optionnel).
 - Ces défis sont **sauvegardés uniquement sur le compte** (table `user_cards`, accès par token de session).
 - Option « **Inclure mes défis dans la partie** » : le jeu pioche alors aussi parmi les défis personnels du compte connecté.
@@ -58,8 +58,8 @@ Déployez `index.html` (Netlify, Vercel, GitHub Pages…) ou ouvrez-le localemen
 | `stats` | `POST /rest/v1/rpc/stats` | `{}` |
 | `reset_game` | `POST /rest/v1/rpc/reset_game` | `{}` |
 | `clear_history` | `POST /rest/v1/rpc/clear_history` | `{}` |
-| `sign_up` | `POST /rest/v1/rpc/sign_up` | `{ "p_username", "p_password", "p_pin" }` |
-| `sign_in` | `POST /rest/v1/rpc/sign_in` | `{ "p_username", "p_password", "p_pin" }` |
+| `sign_up` | `POST /rest/v1/rpc/sign_up` | `{ "p_username", "p_pin" }` |
+| `sign_in` | `POST /rest/v1/rpc/sign_in` | `{ "p_username", "p_pin" }` |
 | `sign_out` | `POST /rest/v1/rpc/sign_out` | `{ "p_token" }` |
 | `me` | `POST /rest/v1/rpc/me` | `{ "p_token" }` |
 | `add_card` | `POST /rest/v1/rpc/add_card` | `{ "p_token", "p_type", "p_text" }` |
@@ -68,12 +68,12 @@ Déployez `index.html` (Netlify, Vercel, GitHub Pages…) ou ouvrez-le localemen
 | `delete_card` | `POST /rest/v1/rpc/delete_card` | `{ "p_token", "p_card_id" }` |
 
 Tables REST : `GET/POST/PATCH/DELETE /rest/v1/players`, `GET /rest/v1/history?select=*&order=id.desc&limit=200`.
-Les mots de passe / PIN sont **hachés** (bcrypt via pgcrypto) ; les tables `accounts` / `sessions` / `user_cards` sont en RLS sans politique (accès uniquement via les RPC).
+Les codes PIN sont **hachés** (bcrypt via pgcrypto) ; les tables `accounts` / `sessions` / `user_cards` sont en RLS sans politique (accès uniquement via les RPC).
 
 ## Thème & palettes
 
 - **Palette par défaut** : **Hot** 🔥 (rouge / or / violet sur fond quasi noir, titre en serif, scanlines + particules, portail 18+).
-- **Autres palettes** : Aurora, Émeraude, Océan, Coucher de soleil — Réglages → Palette de couleurs.
+- **10 palettes** : Hot, Aurora, Émeraude, Océan, Coucher, **Noir & Or**, **Améthyste**, **Minuit**, **Forêt**, **Argent** — Réglages → Palette de couleurs.
 - **Thème** : sombre, clair ou automatique (suit l'appareil) — bouton lune/soleil en haut, ou Réglages.
 - **Portail adulte** : à l'ouverture, un écran « Adultes uniquement » s'affiche (accepté = mémorisé pour la session).
 - Choix mémorisés dans `localStorage`.
