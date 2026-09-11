@@ -773,6 +773,11 @@
     .swatch{width:48px;height:48px}
     .swatch i{width:36px;height:36px}
     .seg.cols3 button{font-size:12px;padding:11px 4px}
+    .prow{gap:6px}
+    .prow .num{width:26px;height:26px;border-radius:9px;font-size:12px}
+    .prow .pts-chip{padding:4px 8px;font-size:11px}
+    .sex-tog button{width:27px;height:27px}
+    .icon-btn.sm{width:34px;height:34px}
     nav.bottom{gap:4px;padding:8px;border-radius:20px}
     nav.bottom .nav-item{padding:8px 1px}
     nav.bottom .nav-item span{font-size:8.5px;letter-spacing:0}
@@ -782,6 +787,8 @@
     .brand h1{font-size:15px}
     .hero h2{font-size:24px}
     .face{padding:16px}
+    .prow .num{display:none}
+    .prow .input{font-size:14px;padding:11px 10px}
     nav.bottom{gap:3px;padding:7px}
     nav.bottom .nav-item .ic{width:20px;height:20px}
   }
@@ -1110,7 +1117,8 @@ const app = {
   includePersonal: safeGet("aov-personal") !== "off",
   defiType: "dare",
   importType: "dare",
-  authMode: "login"
+  authMode: "login",
+  seen: []
 };
 
 /* ===================== PALETTES ===================== */
@@ -1338,7 +1346,23 @@ const FALLBACK_CARDS = {
     "As-tu déjà menti pour éviter une relation ?",
     "Quelle tenue trouves-tu la plus excitante sur toi ?",
     "Quel est le pire rendez-vous que tu aies vécu ?",
-    "As-tu déjà eu une relation interdite ou secrète ?"
+    "As-tu déjà eu une relation interdite ou secrète ?",
+    "Quel est le détail physique qui t'excite tout de suite chez quelqu'un ?",
+    "As-tu déjà eu un coup de cœur pour une personne interdite ?",
+    "Quelle est la chose la plus gênante que ta famille ait découverte sur toi ?",
+    "Raconte ton premier baiser : où, quand, et avec qui ?",
+    "Quel est le fantasme qui revient le plus souvent dans ta tête ?",
+    "As-tu déjà envoyé une photo osée ? À qui ?",
+    "Quelle partie de ton corps aimerais-tu qu'on touche le plus ?",
+    "Quel est le compliment qui t'a le plus troublé(e) ?",
+    "As-tu déjà embrassé deux personnes le même soir ?",
+    "Quelle est la chose que tu n'oserais jamais dire en face ?",
+    "Quel est le rêve le plus chaud que tu aies fait ?",
+    "As-tu déjà été attiré(e) par le ou la partenaire d'un ami ?",
+    "Quel secret sur ta vie amoureuse ne racontes-tu jamais ?",
+    "Qu'est-ce qui te fait craquer chez la personne à ta droite ?",
+    "As-tu déjà dragué quelqu'un juste pour un pari ?",
+    "Quelle est la plus grande audace que tu regrettes ?"
   ],
   dare: [
     "Embrasse le cou de la personne de ton choix pendant 5 secondes.",
@@ -1356,7 +1380,23 @@ const FALLBACK_CARDS = {
     "Imite le joueur le plus timide en train de draguer.",
     "Garde la main de ton voisin pendant 3 tours.",
     "Fais deviner un mot coquin en mimant, sans parler.",
-    "Regarde {nom} dans les yeux 20 secondes sans rire."
+    "Regarde {nom} dans les yeux 20 secondes sans rire.",
+    "Fais un compliment très appuyé à la personne de ton choix, sans rire.",
+    "Laisse la personne à ta gauche te faire un suçon dans le cou.",
+    "Danse collé(e) à {nom} pendant 30 secondes.",
+    "Chuchote à l'oreille de la personne de ton choix la chose la plus osée qui te passe par la tête.",
+    "Masse les mains de {nom} pendant 1 minute, les yeux dans les yeux.",
+    "Fais deviner un fruit en ne te servant que de ta bouche sur le cou de {nom}.",
+    "Garde les mains de la personne en face de toi dans les tiennes pendant 2 tours.",
+    "Envoie un message vocal chaud à quelqu'un hors du groupe.",
+    "Laisse la personne de ton choix te bander les yeux pendant 1 tour.",
+    "Embrasse l'épaule de la personne à ta droite pendant 10 secondes.",
+    "Fais une danse lente très serrée avec {nom} sur 20 secondes de musique.",
+    "Dis à {nom} ce que tu ferais si vous étiez seuls dans la pièce.",
+    "Imite un bruit de baiser sur la joue de la personne de ton choix.",
+    "Fais un massage du cou à la personne la plus proche de toi pendant 30 secondes.",
+    "Souffle dans le cou de la personne à ta gauche pendant 15 secondes.",
+    "Raconte une blague coquine, puis embrasse la main de {nom}."
   ]
 };
 
@@ -1408,11 +1448,14 @@ async function drawCard(type){
   if(app.includePersonal && app.token && app.myCards && app.myCards.length){
     const pool = app.myCards.filter(c => c.type === type);
     if(pool.length && Math.random() < 0.4){
-      return { text: pool[Math.floor(Math.random() * pool.length)].text, source: "personal" };
+      const it = pickFresh(pool, c => c.text);
+      if(it) return { text: it.text, source: "personal" };
     }
   }
   try{
-    return await rpc("draw_card", { p_type: type, p_level: app.level });
+    const card = await rpc("draw_card", { p_type: type, p_level: app.level });
+    if(card && card.text) markSeen(card.text);
+    return card;
   }catch(e){
     // Base injoignable ou non migrée → carte locale pour ne pas bloquer la partie
     if(!app.fallbackWarned){
@@ -1420,8 +1463,25 @@ async function drawCard(type){
       toast("Base non disponible — cartes locales (exécutez migration_cards.sql pour la vraie base)");
     }
     const pool = FALLBACK_CARDS[type] || FALLBACK_CARDS.truth;
-    return { text: pool[Math.floor(Math.random() * pool.length)] };
+    const t = pickFresh(pool, x => x);
+    return { text: t || pool[0] };
   }
+}
+
+/* Évite de ressortir une carte piochée récemment (utile pour les petits paquets :
+   défis perso, cartes locales hors-ligne). Le vrai paquet passe par is_used côté base. */
+function markSeen(t){
+  if(!t) return;
+  app.seen.push(t);
+  if(app.seen.length > 60) app.seen = app.seen.slice(-60);
+}
+function pickFresh(items, keyFn){
+  if(!items || !items.length) return null;
+  const fresh = items.filter(it => app.seen.indexOf(keyFn(it)) === -1);
+  const src = fresh.length ? fresh : items;
+  const it = src[Math.floor(Math.random() * src.length)];
+  markSeen(keyFn(it));
+  return it;
 }
 
 function applyCard(type, card){
@@ -1456,8 +1516,7 @@ function resolveNames(text){
   if(!cur) return text.split("{nom}").join("la personne de ton choix");
   const cs = (cur.sex === "f") ? "f" : "h";
   const oppo = all.filter(p => p !== cur && ((p.sex === "f" ? "f" : "h") !== cs));
-  const pool = oppo.length ? oppo : all.filter(p => p !== cur);
-  const pick = pool[Math.floor(Math.random() * pool.length)];
+  const pick = oppo.length ? oppo[Math.floor(Math.random() * oppo.length)] : null;
   return text.split("{nom}").join(pick ? pick.name : "la personne de ton choix");
 }
 
@@ -1493,6 +1552,7 @@ async function resolve(done){
 }
 
 function nextPlayer(){
+  if(!app.players.length){ showView("home"); return; }
   app.current = (app.current + 1) % app.players.length;
   renderGame();
 }
@@ -1617,7 +1677,13 @@ function bindHome(){
     if(app.players.length >= 10){ toast("10 joueurs maximum"); return; }
     try{
       const order = app.players.length ? Math.max.apply(null, app.players.map(x => x.sort_order || 0)) + 1 : 0;
-      let row = await rest("POST", "/players", { name: "Joueur " + (app.players.length + 1), sort_order: order, sex: "h" });
+      let row;
+      try{
+        row = await rest("POST", "/players", { name: "Joueur " + (app.players.length + 1), sort_order: order, sex: "h" });
+      }catch(e){
+        // Ancienne base sans colonne « sex » → on réessaie sans
+        row = await rest("POST", "/players", { name: "Joueur " + (app.players.length + 1), sort_order: order });
+      }
       row = Array.isArray(row) ? row[0] : row;
       app.players.push(row);
       sfx.click(); renderPlayers(); updateCardsLeft();
@@ -1653,12 +1719,14 @@ function bindHome(){
     if(app.current >= app.players.length) app.current = 0;
     sfx.click(); renderPlayers(); updateCardsLeft();
   });
-  $("#btn-start").addEventListener("click", () => {
+  $("#btn-start").addEventListener("click", async () => {
     if(app.players.length < 2){
       toast("Ajoutez au moins 2 joueurs pour lancer la partie");
       return;
     }
     app.current = 0;
+    app.seen = [];
+    try{ await rpc("new_game"); }catch(e){}   // remélange le paquet : chaque partie repart avec les 10000 cartes
     sfx.win();
     renderGame();
     showView("game");

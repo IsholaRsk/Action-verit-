@@ -134,6 +134,17 @@ begin
 end;
 $fn$;
 
+create or replace function public.new_game()
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+begin
+  update public.cards set is_used = false, last_used = null where is_used = true;
+end;
+$fn$;
+
 grant usage on schema public to anon, authenticated;
 grant select on public.cards to anon, authenticated;
 grant select, insert, update, delete on public.players to anon, authenticated;
@@ -144,6 +155,7 @@ grant execute on function public.draw_card(text, text) to anon, authenticated;
 grant execute on function public.stats() to anon, authenticated;
 grant execute on function public.reset_game() to anon, authenticated;
 grant execute on function public.clear_history() to anon, authenticated;
+grant execute on function public.new_game() to anon, authenticated;
 
 do $seed$
 begin

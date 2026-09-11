@@ -24,6 +24,7 @@ Jeu d'ambiance adulte connecté à Supabase, avec **10000 défis (Brûlant + Har
   - **`la personne de ton choix`**,
   - **`{nom}`** : à l'affichage, remplacé par le prénom d'un joueur dont le **sexe est opposé** à celui du joueur courant.
 - Chaque joueur **choisit son sexe (H / F)** au départ de la partie (pastille H/F dans la liste des joueurs) ; il sert au tirage des défis nominatifs.
+- **Pioche sans répétition** : dans une même partie, une carte piochée ne ressort pas (marquée `is_used`). Au lancement d'une **nouvelle partie**, tout le paquet est **remélangé** (RPC `new_game`) : les 10000 cartes redeviennent disponibles.
 - Format : `{ "id", "type", "level", "text" }` — `verite → truth`, `action → dare`.
 
 ## Mise en route
@@ -60,7 +61,8 @@ Déployez `index.html` (Netlify, Vercel, GitHub Pages…) ou ouvrez-le localemen
 
 | Fonction | Méthode | Corps |
 |---|---|---|
-| `draw_card` | `POST /rest/v1/rpc/draw_card` | `{ "p_type": "truth", "p_level": "brulant" }` |
+| `draw_card` | `POST /rest/v1/rpc/draw_card` | `{ "p_type": "truth", "p_level": "brulant" }` — pioche sans répéter (carte marquée `is_used`) |
+| `new_game` | `POST /rest/v1/rpc/new_game` | `{}` — **remélange tout le paquet** au début de chaque partie |
 | `stats` | `POST /rest/v1/rpc/stats` | `{}` |
 | `reset_game` | `POST /rest/v1/rpc/reset_game` | `{}` |
 | `clear_history` | `POST /rest/v1/rpc/clear_history` | `{}` |
