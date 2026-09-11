@@ -11,14 +11,19 @@ Jeu d'ambiance adulte connecté à Supabase, avec **10000 défis (Brûlant + Har
 | `migration_cards.sql` | **Migration (1/2)** : schéma + fonctions + comptes + cartes 1 à 5000 (~700 Ko) |
 | `migration_cards_2.sql` | **Migration (2/2)** : cartes 5001 à 10000 (~690 Ko) |
 | `cards.json` | Les 10000 cartes au format JSON (données brutes) |
-| `generate_extra.py` | Générateur des 9564 cartes supplémentaires (1064 brûlant + 2000 hardcore + 6500 hardcore++, relançable) |
+| `generate_extra.py` | Générateur déterministe (`seed=7`) du paquet : 5000 actions + 5000 vérités, registre courant, 3 variantes de cible, relançable |
 
 ## Les 10000 cartes
 
 - **Niveau unique** : `brulant` (Brûlant) — aucune sélection de mode dans l'app.
 - **Types** : `truth` = 5000 vérités · `dare` = 5000 actions.
-- Composition : **436 cartes du fichier « Json a ou v »** + **1064 brûlant** + **2000 hardcore** + **6500 hardcore++**.
-- Les **actions** visent toujours une personne **du sexe opposé**.
+- Composition : **436 cartes du fichier « Json a ou v »** + cartes générées (brûlant / hardcore / hardcore++), relançables via `generate_extra.py`.
+- **Français courant** : tous les termes techniques ou anglicismes sont traduits (`lap dance → danse collée`, `strip-tease → effeuillage`, `clavicule → haut de la poitrine`, `reins → bas du dos`, `sexy → sensuel`, …).
+- **Cible des actions** (au lieu de « du sexe opposé ») — trois variantes :
+  - **rien** : l'action ne désigne personne (« Embrasse le cou de la personne à ta gauche… »),
+  - **`la personne de ton choix`**,
+  - **`{nom}`** : à l'affichage, remplacé par le prénom d'un joueur dont le **sexe est opposé** à celui du joueur courant.
+- Chaque joueur **choisit son sexe (H / F)** au départ de la partie (pastille H/F dans la liste des joueurs) ; il sert au tirage des défis nominatifs.
 - Format : `{ "id", "type", "level", "text" }` — `verite → truth`, `action → dare`.
 
 ## Mise en route

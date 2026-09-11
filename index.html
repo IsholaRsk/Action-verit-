@@ -553,6 +553,9 @@
   .prow .num{width:30px;height:30px;flex:none;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;font-size:13px;font-weight:800}
   .prow .input{flex:1}
   .prow .pts-chip{flex:none;font-size:12px;font-weight:800;color:var(--accent);background:var(--accent-soft);border-radius:999px;padding:5px 11px}
+  .sex-tog{display:flex;flex:none;border-radius:11px;border:1px solid var(--glass-brd-soft);overflow:hidden}
+  .sex-tog button{width:30px;height:30px;border:none;background:var(--seg);color:var(--muted);font-size:11px;font-weight:800;cursor:pointer;font-family:inherit;transition:.15s}
+  .sex-tog button.on{background:var(--grad);color:#fff}
   .icon-btn.sm{width:38px;height:38px;border-radius:11px}
   .icon-btn.sm .ic{width:18px;height:18px}
   .icon-btn.danger:hover{color:#f87171;border-color:rgba(248,113,113,.3);background:rgba(248,113,113,.1)}
@@ -836,6 +839,7 @@
           <label class="lbl" style="margin-top:0">Joueurs</label>
           <div class="players-list" id="players-list"></div>
           <button class="btn btn-ghost small" id="add-player" style="margin-top:12px"><span data-icon="plus"></span>Ajouter un joueur</button>
+          <p class="hint" style="text-align:left;margin-top:8px">Choisissez le sexe (H / F) de chaque joueur — il sert au tirage des défis nominatifs.</p>
 
           <button class="btn btn-primary" id="btn-start" style="margin-top:22px"><span data-icon="play"></span>Lancer la partie</button>
           <div class="cards-left" id="cards-left"></div>
@@ -1275,8 +1279,14 @@ function renderPlayers(){
   app.players.forEach((p, i) => {
     const row = document.createElement("div");
     row.className = "prow";
+    const sex = (p.sex === "f") ? "f" : "h";
+    p.sex = sex;
     row.innerHTML =
       '<span class="num">' + (i + 1) + '</span>' +
+      '<span class="sex-tog" data-id="' + p.id + '" title="Sexe du joueur (sert au tirage des défis nominatifs)">' +
+        '<button class="sx' + (sex === "h" ? " on" : "") + '" data-v="h">H</button>' +
+        '<button class="sx' + (sex === "f" ? " on" : "") + '" data-v="f">F</button>' +
+      '</span>' +
       '<input class="input pname" data-id="' + p.id + '" value="' + esc(p.name) + '" maxlength="18" placeholder="Nom du joueur">' +
       '<span class="pts-chip">' + (p.score || 0) + ' pt</span>' +
       '<button class="icon-btn sm danger rm" data-id="' + p.id + '" title="Retirer">' + iconSvg("trash") + '</button>';
@@ -1331,22 +1341,22 @@ const FALLBACK_CARDS = {
     "As-tu déjà eu une relation interdite ou secrète ?"
   ],
   dare: [
-    "Embrasse le cou de la personne du sexe opposé à ta gauche pendant 5 secondes.",
-    "Laisse la personne du sexe opposé en face de toi t'écrire un mot sur le corps.",
+    "Embrasse le cou de la personne de ton choix pendant 5 secondes.",
+    "Laisse la personne en face de toi t'écrire un mot sur le corps.",
     "Danse sensuellement sur 30 secondes de musique choisie par les autres.",
-    "Appelle quelqu'un du sexe opposé et avoue-lui que tu penses à lui/elle.",
-    "Échange un vêtement avec la personne du sexe opposé de ton choix.",
-    "Fais un massage de 60 secondes à la personne du sexe opposé à ta droite.",
+    "Appelle {nom} et avoue-lui que tu penses à lui/elle.",
+    "Échange un vêtement avec la personne de ton choix.",
+    "Fais un massage de 60 secondes à la personne à ta droite.",
     "Laisse-toi poser une question intime sans esquiver.",
-    "Mime une scène romantique avec la personne du sexe opposé de ton choix.",
-    "Envoie un message coquin à la dernière personne du sexe opposé qui t'a écrit.",
-    "Fais un compliment très osé à chaque joueur du sexe opposé.",
-    "Laisse la personne du sexe opposé de ton choix te poser un glaçon dans le dos.",
-    "Chuchote un secret à l'oreille de la personne du sexe opposé à ta gauche.",
-    "Imite le joueur du sexe opposé le plus timide en train de draguer.",
-    "Garde la main de ton voisin du sexe opposé pendant 3 tours.",
+    "Mime une scène romantique avec la personne de ton choix.",
+    "Envoie un message coquin à la dernière personne qui t'a écrit.",
+    "Fais un compliment très osé à la personne de ton choix.",
+    "Laisse la personne de ton choix te poser un glaçon dans le dos.",
+    "Chuchote un secret à l'oreille de {nom}.",
+    "Imite le joueur le plus timide en train de draguer.",
+    "Garde la main de ton voisin pendant 3 tours.",
     "Fais deviner un mot coquin en mimant, sans parler.",
-    "Regarde la personne du sexe opposé de ton choix dans les yeux 20 secondes sans rire."
+    "Regarde {nom} dans les yeux 20 secondes sans rire."
   ]
 };
 
@@ -1415,8 +1425,9 @@ async function drawCard(type){
 }
 
 function applyCard(type, card){
+  const text = resolveNames(card.text);
   app.type = type;
-  app.cardText = card.text;
+  app.cardText = text;
   app.resolved = false;
 
   const isTruth = type === "truth";
@@ -1428,13 +1439,26 @@ function applyCard(type, card){
   $("#back-tag").textContent = label;
   $("#back-face").className = "face back " + (isTruth ? "truth" : "dare");
   $("#card-lvl").textContent = app.level;
-  $("#card-text").textContent = card.text;
+  $("#card-text").textContent = text;
 
   $("#scene").style.display = "block";
   $("#resolve").style.display = "none";
   $("#next-wrap").classList.remove("show");
   $("#card").classList.remove("flipped");
   sfx.click();
+}
+
+/* Remplace {nom} par le prénom d'un joueur du sexe opposé au joueur courant */
+function resolveNames(text){
+  if(text.indexOf("{nom}") === -1) return text;
+  const all = app.players || [];
+  const cur = all[app.current];
+  if(!cur) return text.split("{nom}").join("la personne de ton choix");
+  const cs = (cur.sex === "f") ? "f" : "h";
+  const oppo = all.filter(p => p !== cur && ((p.sex === "f" ? "f" : "h") !== cs));
+  const pool = oppo.length ? oppo : all.filter(p => p !== cur);
+  const pick = pool[Math.floor(Math.random() * pool.length)];
+  return text.split("{nom}").join(pick ? pick.name : "la personne de ton choix");
 }
 
 function flipCard(){
@@ -1593,7 +1617,7 @@ function bindHome(){
     if(app.players.length >= 10){ toast("10 joueurs maximum"); return; }
     try{
       const order = app.players.length ? Math.max.apply(null, app.players.map(x => x.sort_order || 0)) + 1 : 0;
-      let row = await rest("POST", "/players", { name: "Joueur " + (app.players.length + 1), sort_order: order });
+      let row = await rest("POST", "/players", { name: "Joueur " + (app.players.length + 1), sort_order: order, sex: "h" });
       row = Array.isArray(row) ? row[0] : row;
       app.players.push(row);
       sfx.click(); renderPlayers(); updateCardsLeft();
@@ -1611,6 +1635,17 @@ function bindHome(){
     }
   });
   $("#players-list").addEventListener("click", async e => {
+    const sx = e.target.closest(".sx");
+    if(sx){
+      const id = sx.closest(".sex-tog").dataset.id;
+      const v = sx.dataset.v;
+      const p = app.players.find(x => String(x.id) === String(id));
+      if(!p) return;
+      p.sex = v;
+      try{ await rest("PATCH", "/players?id=eq." + id, { sex: v }); }catch(err){}
+      sfx.click(); renderPlayers();
+      return;
+    }
     const btn = e.target.closest(".rm"); if(!btn) return;
     const id = btn.dataset.id;
     try{ await rest("DELETE", "/players?id=eq." + id); }catch(err){}

@@ -108,21 +108,88 @@ CURATED_ACTIONS = [
 ]
 action_candidates += CURATED_ACTIONS
 
-# Contractions françaises (au/du/aux/des)
+# Contractions françaises (au/du/aux/des) + élisions
 def fix(t):
     t = t.replace(" à le ", " au ").replace(" à les ", " aux ")
     t = t.replace(" de le ", " du ").replace(" de les ", " des ")
     t = t.replace("jusqu'à le ", "jusqu'au ").replace("jusqu'à les ", "jusqu'aux ")
+    t = t.replace("te embrasse", "t'embrasse").replace("te embrassant", "t'embrassant")
+    t = t.replace("te effleure", "t'effleure").replace("te effleurant", "t'effleurant")
     return t
 
-# Les cartes d'action visent toujours une personne du sexe opposé
-def opposite_sex(t):
-    t = t.replace("la personne", "la personne du sexe opposé")
-    t = t.replace("une personne", "une personne du sexe opposé")
-    t = t.replace("chaque personne", "chaque personne du sexe opposé")
-    t = t.replace("quelqu'un", "quelqu'un du sexe opposé")
-    t = t.replace("chaque joueur", "chaque joueur du sexe opposé")
-    return t
+# --- Registre courant : traduit les termes techniques / anglicismes ---
+COMMON = {
+    "body shot": "shot",
+    "un lap dance très rapproché": "une danse très collée",
+    "un lap dance": "une danse collée",
+    "lap dance": "danse collée",
+    "strip-tease": "effeuillage",
+    "un slow": "une danse lente",
+    "de hipbone à hipbone": "d'une hanche à l'autre",
+    "un 7 minutes au paradis": "7 minutes en tête à tête",
+    "assis à califourchon sur lui/elle": "assis(e) sur ses genoux",
+    "Assois-toi à califourchon sur": "Assois-toi sur les genoux de",
+    "à califourchon sur": "sur les genoux de",
+    "entre les deux omoplates": "en haut du dos, entre les épaules",
+    "entre les omoplates": "en haut du dos",
+    "des omoplates": "du haut du dos",
+    "les omoplates": "le haut du dos",
+    "la clavicule": "le haut de la poitrine",
+    "clavicule": "haut de la poitrine",
+    "sternum": "milieu de la poitrine",
+    "trapèzes": "épaules",
+    "creux du coude": "pli du coude",
+    "cuir chevelu": "crâne",
+    "de la colonne vertébrale": "du dos",
+    "la colonne vertébrale": "le dos",
+    "colonne vertébrale": "dos",
+    "ta colonne": "ton dos",
+    "sa colonne": "son dos",
+    "la colonne": "le dos",
+    "les reins": "le bas du dos",
+    "aux reins": "au bas du dos",
+    "des reins": "du bas du dos",
+    "reins": "bas du dos",
+    "bas-ventre": "bas du ventre",
+    "sexy": "sensuel",
+    "fantasy": "fantasme",
+}
+def common_register(t):
+    for k, v in COMMON.items():
+        t = t.replace(k, v)
+    return fix(t)
+
+# --- 3 variantes pour désigner la personne visée (au lieu de « du sexe opposé ») ---
+# A : rien · B : « la personne de ton choix » · C : « {nom} » (nom d'un joueur du sexe opposé)
+import re
+PERSON_RE = re.compile(
+    r"(?:la personne (?:à ta droite|à ta gauche|en face de toi|devant toi|de ton choix|la plus proche de toi|choisie par vote du groupe|la plus audacieuse du groupe|la plus timide du groupe)"
+    r"|quelqu'un(?: qui accepte| qui enlève son t-shirt)?"
+    r"|une personne"
+    r"|chaque personne(?: du groupe)?"
+    r"|chaque joueur"
+    r"|un joueur"
+    r"|ton voisin"
+    r"|un inconnu)"
+)
+def person_variant(t):
+    m = PERSON_RE.search(t)
+    if not m:
+        return t
+    phrase = m.group(0)
+    if phrase.startswith("chaque"):
+        return t                     # « chaque » : on ne remplace pas par un nom unique
+    r = random.random()
+    if r < 0.34:
+        return t                     # variante A : rien
+    if r < 0.67:
+        return t[:m.start()] + "la personne de ton choix" + t[m.end():]   # variante B
+    return t[:m.start()] + "{nom}" + t[m.end():]                          # variante C
+
+def finalize_dare(t):
+    return person_variant(common_register(t))
+def finalize_truth(t):
+    return common_register(t)
 
 action_candidates = [fix(t) for t in action_candidates]
 
@@ -138,7 +205,6 @@ def dedup(cands, existing):
 
 new_actions = dedup(action_candidates, existing_texts)
 random.shuffle(new_actions)
-new_actions = new_actions[:616]
 
 # ----------------------------------------------------------------------
 # 4) Génération des vérités (candidates)
@@ -452,7 +518,6 @@ truth_candidates = [fix(t) for t in truth_candidates]
 
 new_truths = dedup(truth_candidates, existing_texts)
 random.shuffle(new_truths)
-new_truths = new_truths[:448]
 
 # ----------------------------------------------------------------------
 # 4bis) 2000 cartes HARDCORE (1160 actions + 840 vérités) — niveau brulant
@@ -565,12 +630,10 @@ hard_truth_candidates = [fix(t) for t in hard_truth_candidates]
 used = set(existing_texts) | set(new_actions) | set(new_truths)
 hard_actions = dedup(hard_action_candidates, used)
 random.shuffle(hard_actions)
-hard_actions = hard_actions[:1160]
 
 used |= set(hard_actions)
 hard_truths = dedup(hard_truth_candidates, used)
 random.shuffle(hard_truths)
-hard_truths = hard_truths[:840]
 
 # ----------------------------------------------------------------------
 # 4ter) 6500 cartes HARDCORE++ (2972 actions + 3528 vérités) — niveau brulant
@@ -713,47 +776,45 @@ hx_truth_candidates = [fix(t) for t in hx_truth_candidates]
 used |= set(hard_truths)
 hx_actions = dedup(hx_action_candidates, used)
 random.shuffle(hx_actions)
-hx_actions = hx_actions[:2972]
 
 used |= set(hx_actions)
 hx_truths = dedup(hx_truth_candidates, used)
 random.shuffle(hx_truths)
-hx_truths = hx_truths[:3528]
 
 # ----------------------------------------------------------------------
-# 5) Assemblage final : 436 + 1064 + 2000 + 6500 = 10000
+# 5) Assemblage final : 5000 actions + 5000 vérités (variantes + registre courant)
 # ----------------------------------------------------------------------
+def _uniq(lst):
+    seen = set(); out = []
+    for x in lst:
+        if x not in seen:
+            seen.add(x); out.append(x)
+    return out
+
+# Originaux (finalisés, dédupliqués, conservés en tête)
+orig_dares  = _uniq([finalize_dare(d["text"])  for d in src if TYPE[d["type"]] == "dare"])
+orig_truths = _uniq([finalize_truth(d["text"]) for d in src if TYPE[d["type"]] == "truth"])
+
+# Pools générés (finalisés puis dédupliqués contre les originaux)
+seen = set(orig_dares) | set(orig_truths)
+gen_dares  = dedup([finalize_dare(t)  for t in new_actions + hard_actions + hx_actions], seen)
+seen |= set(gen_dares)
+gen_truths = dedup([finalize_truth(t) for t in new_truths + hard_truths + hx_truths], seen)
+
+random.shuffle(gen_dares)
+random.shuffle(gen_truths)
+final_dares  = orig_dares  + gen_dares[:5000 - len(orig_dares)]
+final_truths = orig_truths + gen_truths[:5000 - len(orig_truths)]
+
 cards, cid = [], 1
-for d in src:  # les 436 d'origine
-    text = d["text"]
-    if TYPE[d["type"]] == "dare":
-        text = opposite_sex(text)
-    cards.append({"id": cid, "type": TYPE[d["type"]], "level": "brulant", "text": text})
-    cid += 1
-for t in new_actions:
-    cards.append({"id": cid, "type": "dare", "level": "brulant", "text": opposite_sex(t)})
-    cid += 1
-for t in new_truths:
-    cards.append({"id": cid, "type": "truth", "level": "brulant", "text": t})
-    cid += 1
-for t in hard_actions:
-    cards.append({"id": cid, "type": "dare", "level": "brulant", "text": opposite_sex(t)})
-    cid += 1
-for t in hard_truths:
-    cards.append({"id": cid, "type": "truth", "level": "brulant", "text": t})
-    cid += 1
-for t in hx_actions:
-    cards.append({"id": cid, "type": "dare", "level": "brulant", "text": opposite_sex(t)})
-    cid += 1
-for t in hx_truths:
-    cards.append({"id": cid, "type": "truth", "level": "brulant", "text": t})
-    cid += 1
+for t in final_dares:
+    cards.append({"id": cid, "type": "dare", "level": "brulant", "text": t}); cid += 1
+for t in final_truths:
+    cards.append({"id": cid, "type": "truth", "level": "brulant", "text": t}); cid += 1
 
 texts = [c["text"] for c in cards]
 assert len(texts) == len(set(texts)) == 10000, "Doublons détectés !"
-assert len(new_actions) == 616 and len(new_truths) == 448, "Comptage erroné"
-assert len(hard_actions) == 1160 and len(hard_truths) == 840, "Comptage hardcore erroné"
-assert len(hx_actions) == 2972 and len(hx_truths) == 3528, "Comptage hardcore++ erroné"
+assert len(final_dares) == 5000 and len(final_truths) == 5000, "Comptage erroné"
 
 print("Total cartes :", len(cards))
 from collections import Counter
@@ -786,7 +847,8 @@ insert_block_b = make_block(cards[half:])
 
 HEADER = """-- =====================================================================
 --  ACTION OU VERITE -- BACKEND SUPABASE COMPLET (fichier unique)
---  10000 cartes niveau "brulant" (436 d'origine + 1064 brûlant + 2000 hardcore + 6500 hardcore++)
+--  10000 cartes niveau "brulant" (5000 actions + 5000 vérités, français courant,
+--  3 variantes de cible : sans cible / « la personne de ton choix » / « {nom} »)
 --  Supabase -> SQL Editor -> New query -> coller tout -> RUN
 -- =====================================================================
 
@@ -805,6 +867,7 @@ create index if not exists cards_level_type_idx on public.cards (level, type);
 create table if not exists public.players (
   id         uuid primary key default gen_random_uuid(),
   name       text not null,
+  sex        text not null default 'h',
   score      integer not null default 0,
   sort_order integer not null default 0,
   created_at timestamptz not null default now()
@@ -944,6 +1007,8 @@ AUTH_SQL = """
 --  COMPTES (nom d'utilisateur + code PIN) & DÉFIS PERSONNELS
 -- =====================================================================
 create extension if not exists pgcrypto;
+
+alter table public.players add column if not exists sex text not null default 'h';
 
 create table if not exists public.accounts (
   id         bigint generated by default as identity primary key,
@@ -1215,6 +1280,36 @@ MIGRATION = """-- ==============================================================
 -- =====================================================================
 begin;
 
+create extension if not exists pgcrypto;
+
+create table if not exists public.players (
+  id         uuid primary key default gen_random_uuid(),
+  name       text not null,
+  sex        text not null default 'h',
+  score      integer not null default 0,
+  sort_order integer not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.history (
+  id          bigint generated by default as identity primary key,
+  player_id   uuid references public.players(id) on delete set null,
+  player_name text,
+  type        text,
+  text        text,
+  done        boolean not null default false,
+  level       text,
+  created_at  timestamptz not null default now()
+);
+create index if not exists history_id_idx on public.history (id desc);
+
+alter table public.players enable row level security;
+alter table public.history enable row level security;
+drop policy if exists "players_anon_all" on public.players;
+create policy "players_anon_all" on public.players for all using (true) with check (true);
+drop policy if exists "history_anon_all" on public.history;
+create policy "history_anon_all" on public.history for all using (true) with check (true);
+
 drop table if exists public.cards cascade;
 
 create table public.cards (
@@ -1321,31 +1416,9 @@ with open("migration_cards_2.sql", "w", encoding="utf-8") as f:
 print("supabase.sql + migration_cards.sql (1/2) + migration_cards_2.sql (2/2) écrits")
 
 # échantillons
-print("\nÉchantillon nouvelles actions :")
-for t in new_actions[:6]:
-    print("  ", opposite_sex(t))
-print("Échantillon nouvelles vérités :")
-for t in new_truths[:6]:
-    print("  ", t)
-print("\nÉchantillon hardcore actions :")
-for t in hard_actions[:4]:
-    print("  ", opposite_sex(t))
-print("Échantillon hardcore vérités :")
-for t in hard_truths[:4]:
-    print("  ", t)
-print("\nÉchantillon hardcore++ actions :")
-for t in hx_actions[:4]:
-    print("  ", opposite_sex(t))
-print("Échantillon hardcore++ vérités :")
-for t in hx_truths[:4]:
-    print("  ", t)
-    print("  ", opposite_sex(t))
-print("Échantillon hardcore vérités :")
-for t in hard_truths[:4]:
-    print("  ", t)
-print("\nÉchantillon hardcore++ actions :")
-for t in hx_actions[:4]:
-    print("  ", opposite_sex(t))
-print("Échantillon hardcore++ vérités :")
-for t in hx_truths[:4]:
-    print("  ", t)
+print("\nÉchantillon actions finales (variantes + registre courant) :")
+for t in final_dares[:8]:
+    print("  -", t)
+print("\nÉchantillon vérités finales :")
+for t in final_truths[:6]:
+    print("  -", t)
