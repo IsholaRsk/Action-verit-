@@ -55,7 +55,9 @@ Déployez `index.html` (Netlify, Vercel, GitHub Pages…) ou ouvrez-le localemen
 - Une fois connecté, on peut **ajouter un défi** (Action / Vérité) ou **importer un fichier** (`.json` ou `.txt`, un défi par ligne, préfixe `action:` / `verite:` optionnel).
 - Ces défis sont **sauvegardés uniquement sur le compte** (table `user_cards`, accès par token de session).
 - Bouton **globe** sur chaque défi : **publie** le défi pour qu'il rejoigne le paquet commun et soit **accessible à tous les joueurs** (table `cards`, source `community`). Re-cliquer pour le retirer.
-- Option « **Inclure mes défis dans la partie** » : le jeu pioche alors aussi parmi les défis personnels du compte connecté.
+- Bouton **« Tout publier »** : publie **tous** les défis personnels d'un seul coup.
+- Bouton **crayon** sur chaque défi : **modifie** le texte (répercuté dans le paquet commun si le défi est publié).
+- Option « **Inclure mes défis dans la partie** » : le jeu pioche alors aussi parmi les défis personnels du compte connecté (sans répéter un défi récemment montré).
 
 ## RPC disponibles (appels depuis l'app)
 
@@ -76,6 +78,8 @@ Déployez `index.html` (Netlify, Vercel, GitHub Pages…) ou ouvrez-le localemen
 | `delete_card` | `POST /rest/v1/rpc/delete_card` | `{ "p_token", "p_card_id" }` |
 | `publish_card` | `POST /rest/v1/rpc/publish_card` | `{ "p_token", "p_card_id" }` — rend le défi **accessible à tous** |
 | `unpublish_card` | `POST /rest/v1/rpc/unpublish_card` | `{ "p_token", "p_card_id" }` — retire le défi du paquet commun |
+| `publish_all_cards` | `POST /rest/v1/rpc/publish_all_cards` | `{ "p_token" }` — **publie tous** les défis personnels d'un coup (retourne le nombre publié) |
+| `update_card` | `POST /rest/v1/rpc/update_card` | `{ "p_token", "p_card_id", "p_text" }` — **modifie** un défi personnel (répercuté dans le paquet commun s'il est publié) |
 
 Tables REST : `GET/POST/PATCH/DELETE /rest/v1/players`, `GET /rest/v1/history?select=*&order=id.desc&limit=200`.
 Les codes PIN sont **hachés** (bcrypt via pgcrypto) ; les tables `accounts` / `sessions` / `user_cards` sont en RLS sans politique (accès uniquement via les RPC).

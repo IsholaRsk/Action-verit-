@@ -586,7 +586,12 @@
   .drow .dtext{flex:1;min-width:0;word-break:break-word}
   .drow .ddel{width:34px;height:34px;flex:none}
   .drow .dpub{width:34px;height:34px;flex:none}
+  .drow .dedit{width:34px;height:34px;flex:none}
   .drow .dpub.pub-on{background:var(--accent-soft);color:var(--accent);border-color:var(--accent)}
+  .drow.editing{flex-wrap:wrap}
+  .drow.editing .dedit-text{flex:1 1 100%;width:auto;min-width:0;min-height:64px;font-size:13.5px;line-height:1.45;order:5}
+  .drow .dedit-save{color:#34d399;border-color:rgba(52,211,153,.35)}
+  .drow .dedit-save:hover{background:rgba(52,211,153,.12)}
   .cards-left{display:flex;justify-content:center;gap:14px;margin-top:14px;font-size:12px;color:var(--muted);font-weight:600}
   .cards-left span{display:flex;align-items:center;gap:6px}
   .cards-left .ic{width:15px;height:15px}
@@ -972,7 +977,11 @@
 
           <div class="glass-panel">
             <label class="lbl" style="margin-top:0">Mes défis (<span id="mycount">0</span>)</label>
-            <p class="hint" style="text-align:left;margin:0 0 10px">Bouton <b>globe</b> : publier le défi pour qu'il soit accessible à <b>tous</b> les joueurs.</p>
+            <div class="setting-row" style="border-bottom:none;padding-top:0">
+              <div class="txt"><b>Publier tous mes défis</b><span>Rend tous vos défis personnels accessibles à tous les joueurs en un clic</span></div>
+              <button class="btn btn-ghost small" id="btn-publish-all" style="width:auto"><span data-icon="globe"></span>Tout publier</button>
+            </div>
+            <p class="hint" style="text-align:left;margin:0 0 10px">Boutons : <b>crayon</b> modifier · <b>globe</b> publier/retirer · <b>corbeille</b> supprimer.</p>
             <div id="mycards-list"></div>
           </div>
         </div>
@@ -1056,6 +1065,7 @@ const ICONS = {
   sliders: '<line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>',
   plus: '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>',
   trash: '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>',
+  pencil: '<path d="M17 3a2.8 2.8 0 0 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>',
   check: '<polyline points="20 6 9 17 4 12"/>',
   x: '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
   eye: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>',
@@ -1447,9 +1457,16 @@ async function drawCard(type){
   // Défis personnels du compte (si connecté + option activée)
   if(app.includePersonal && app.token && app.myCards && app.myCards.length){
     const pool = app.myCards.filter(c => c.type === type);
-    if(pool.length && Math.random() < 0.4){
-      const it = pickFresh(pool, c => c.text);
-      if(it) return { text: it.text, source: "personal" };
+    if(pool.length){
+      // on ne pioche que parmi les défis pas encore vus récemment :
+      // si tous ont déjà été montrés, on retombe sur le paquet principal
+      // (plus de répétition en boucle du même défi)
+      const fresh = pool.filter(c => app.seen.indexOf(c.text) === -1);
+      if(fresh.length && Math.random() < 0.4){
+        const it = fresh[Math.floor(Math.random() * fresh.length)];
+        markSeen(it.text);
+        return { text: it.text, source: "personal" };
+      }
     }
   }
   try{
@@ -1841,9 +1858,10 @@ async function loadMyCards(){
   const shown = app.myCards.slice(0, 200);
   list.innerHTML = shown.map(c => {
     const pub = !!c.public_id;
-    return '<div class="drow">' +
+    return '<div class="drow" data-id="' + c.id + '" data-type="' + c.type + '">' +
       '<span class="dtag ' + (c.type === "truth" ? "truth" : "dare") + '">' + (c.type === "truth" ? "Vérité" : "Action") + '</span>' +
       '<span class="dtext">' + esc(c.text) + '</span>' +
+      '<button class="icon-btn sm dedit" data-id="' + c.id + '" title="Modifier">' + iconSvg("pencil") + '</button>' +
       '<button class="icon-btn sm dpub' + (pub ? ' pub-on' : '') + '" data-id="' + c.id + '" data-pub="' + (pub ? '1' : '0') + '" title="' + (pub ? 'Retirer de la publication' : 'Publier pour tous les joueurs') + '">' + iconSvg(pub ? 'globe-on' : 'globe') + '</button>' +
       '<button class="icon-btn sm danger ddel" data-id="' + c.id + '" title="Supprimer">' + iconSvg("trash") + '</button>' +
     '</div>';
@@ -1871,6 +1889,37 @@ async function togglePublish(id, published){
     await rpc(published ? "unpublish_card" : "publish_card", { p_token: app.token, p_card_id: id });
     sfx.click();
     toast(published ? "Défi retiré de la publication" : "Défi publié — accessible à tous !");
+    loadMyCards();
+  }catch(e){ toast("Erreur : " + e.message); }
+}
+function startEditDefi(row, c){
+  row.classList.add("editing");
+  row.innerHTML =
+    '<span class="dtag ' + (c.type === "truth" ? "truth" : "dare") + '">' + (c.type === "truth" ? "Vérité" : "Action") + '</span>' +
+    '<span class="dtext" style="flex:1;min-width:0;color:var(--muted);font-size:12px">Modification en cours…</span>' +
+    '<button class="icon-btn sm dedit-save" title="Enregistrer">' + iconSvg("check") + '</button>' +
+    '<button class="icon-btn sm danger dedit-cancel" title="Annuler">' + iconSvg("x") + '</button>' +
+    '<textarea class="input dedit-text" rows="2" maxlength="400">' + esc(c.text) + '</textarea>';
+  const ta = row.querySelector(".dedit-text");
+  ta.focus();
+  ta.setSelectionRange(ta.value.length, ta.value.length);
+}
+async function saveDefi(row){
+  const id = row.dataset.id;
+  const text = (row.querySelector(".dedit-text") || {}).value;
+  if(!text || text.trim().length < 4){ toast("Texte trop court (4 caractères minimum)"); return; }
+  try{
+    await rpc("update_card", { p_token: app.token, p_card_id: Number(id), p_text: text.trim() });
+    sfx.click(); toast("Défi modifié");
+    loadMyCards();
+  }catch(e){ toast("Erreur : " + e.message); }
+}
+async function publishAllDefis(){
+  const unpub = app.myCards.filter(c => !c.public_id).length;
+  if(!unpub){ toast("Tous vos défis sont déjà publiés"); return; }
+  try{
+    const n = await rpc("publish_all_cards", { p_token: app.token });
+    sfx.win(); toast(n + " défi(s) publié(s) — accessible(s) à tous !");
     loadMyCards();
   }catch(e){ toast("Erreur : " + e.message); }
 }
@@ -1944,11 +1993,29 @@ function bindDefis(){
     $("#switch-personal").classList.toggle("on", app.includePersonal);
     sfx.click();
   });
+  $("#btn-publish-all").addEventListener("click", publishAllDefis);
   $("#mycards-list").addEventListener("click", e => {
     const d = e.target.closest(".ddel");
     if(d){ delDefi(d.dataset.id); return; }
     const p = e.target.closest(".dpub");
-    if(p){ togglePublish(p.dataset.id, p.dataset.pub === "1"); }
+    if(p){ togglePublish(p.dataset.id, p.dataset.pub === "1"); return; }
+    const ed = e.target.closest(".dedit");
+    if(ed){
+      const row = ed.closest(".drow");
+      const c = app.myCards.find(x => String(x.id) === String(ed.dataset.id));
+      if(row && c) startEditDefi(row, c);
+      return;
+    }
+    const sv = e.target.closest(".dedit-save");
+    if(sv){ saveDefi(sv.closest(".drow")); return; }
+    const cx = e.target.closest(".dedit-cancel");
+    if(cx){ sfx.click(); loadMyCards(); }
+  });
+  $("#mycards-list").addEventListener("keydown", e => {
+    if(e.key === "Enter" && e.target.classList.contains("dedit-text")){
+      e.preventDefault();
+      saveDefi(e.target.closest(".drow"));
+    }
   });
 }
 async function initSession(){

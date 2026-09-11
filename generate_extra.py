@@ -1270,6 +1270,59 @@ begin
 end;
 $fn$;
 
+create or replace function public.update_card(p_token uuid, p_card_id bigint, p_text text)
+returns json
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+declare
+  v_acc bigint;
+  uc public.user_cards%rowtype;
+begin
+  select account_id into v_acc from public.sessions where token = p_token;
+  if v_acc is null then raise exception 'Non connecte'; end if;
+  select * into uc from public.user_cards where id = p_card_id and account_id = v_acc;
+  if uc.id is null then raise exception 'Défi introuvable'; end if;
+  p_text := btrim(coalesce(p_text, ''));
+  if length(p_text) < 4 then raise exception 'Texte trop court (4 caracteres minimum)'; end if;
+  update public.user_cards set text = p_text where id = uc.id;
+  -- si le défi est publié, on répercute la modification dans le paquet commun
+  if uc.public_id is not null then
+    update public.cards set text = p_text where id = uc.public_id;
+  end if;
+  return json_build_object('id', uc.id, 'text', p_text, 'public_id', uc.public_id);
+end;
+$fn$;
+
+create or replace function public.publish_all_cards(p_token uuid)
+returns integer
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+declare
+  v_acc bigint;
+  uc record;
+  nid bigint;
+  n integer := 0;
+begin
+  select account_id into v_acc from public.sessions where token = p_token;
+  if v_acc is null then raise exception 'Non connecte'; end if;
+  for uc in
+    select * from public.user_cards
+     where account_id = v_acc and public_id is null
+  loop
+    insert into public.cards (type, level, text, source, author_id)
+    values (uc.type, 'brulant', uc.text, 'community', v_acc)
+    returning id into nid;
+    update public.user_cards set public_id = nid where id = uc.id;
+    n := n + 1;
+  end loop;
+  return n;
+end;
+$fn$;
+
 grant execute on function public.sign_up(text, text) to anon, authenticated;
 grant execute on function public.sign_in(text, text) to anon, authenticated;
 grant execute on function public.me(uuid) to anon, authenticated;
@@ -1280,6 +1333,8 @@ grant execute on function public.my_cards(uuid) to anon, authenticated;
 grant execute on function public.delete_card(uuid, bigint) to anon, authenticated;
 grant execute on function public.publish_card(uuid, bigint) to anon, authenticated;
 grant execute on function public.unpublish_card(uuid, bigint) to anon, authenticated;
+grant execute on function public.update_card(uuid, bigint, text) to anon, authenticated;
+grant execute on function public.publish_all_cards(uuid) to anon, authenticated;
 """
 
 with open("supabase.sql", "w", encoding="utf-8") as f:
